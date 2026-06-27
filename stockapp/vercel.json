@@ -1,0 +1,10 @@
+{
+  "framework": "nextjs",
+  "buildCommand": "npm run build",
+  "devCommand": "npm run dev",
+  "installCommand": "npm install",
+  "env": {
+    "FINNHUB_KEY": "@finnhub_key",
+    "FRED_KEY": "@fred_key"
+  }
+}
