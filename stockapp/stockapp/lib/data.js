@@ -1,0 +1,483 @@
+// ═══════════════════════════════════════════════════
+// 핵심 투자 데이터 — lib/data.js
+// 매분기 업데이트: 구루 포지션, 재무 기초, 기대값
+// ═══════════════════════════════════════════════════
+
+export const STOCK_UNIVERSE = {
+  // ── 보유 종목 ────────────────────────────────────
+  GOOGL: {
+    name: '알파벳', nameEn: 'Alphabet Inc.', flag: '🇺🇸',
+    sector: 'AI·클라우드', type: 'portfolio',
+    exchange: 'NASDAQ',
+    // 역산 DCF 기대값 (모부신 방법론)
+    fair_value: 392, fair_low: 340, fair_high: 460,
+    // 재무 기초 (FY2025 기준, 분기마다 업데이트)
+    eps_ttm: 13.11, revenue_ttm: 422.5e9,
+    revenue_per_share: 34.6, bvps: 22.4,
+    fcf_annual: 73e9, sbc_annual: 22e9,
+    shares_out: 12.2e9, net_cash: 31e9,
+    // 품질 (SEC EDGAR 기반 분기 계산)
+    piotroski: 8, beneish_m: -2.1, altman_z: 8.4,
+    roic: 28.34, wacc: 9.06,
+    // 모멘텀
+    mom_12_1: 18.5, // 12-1M 가격 모멘텀 %
+    erv_score: 0.3, // 어닝 리비전 (상향비율 - 하향비율)
+    // 텐베거 지표
+    rule_of_40: null, // 성숙 기업, 별도 계산 안 함
+    rev_growth_yoy: 14.5, rev_growth_accel: 2.1,
+    gross_margin: 58.1, gm_trend: 1.2, // 전분기 대비
+    // 구루
+    guru_cost: 390, guru_cost_type: '추정치',
+    guru_note: '버크셔 6월 $100억 신규+TCI+뢰브 클러스터',
+    // 세그먼트 (Finnhub 자동, 아래는 초기값)
+    segments: [
+      { name: 'Search·광고', pct: 72, growth: 14.0, trend: 'stable' },
+      { name: 'Google Cloud', pct: 11, growth: 48.0, trend: 'accel' },
+      { name: 'YouTube', pct: 11, growth: 8.0, trend: 'stable' },
+      { name: 'Other Bets', pct: 6, growth: -2.0, trend: 'down' },
+    ],
+    geo: [
+      { name: '미국', pct: 48 }, { name: '유럽', pct: 26 },
+      { name: 'APAC', pct: 16 }, { name: '기타', pct: 10 },
+    ],
+    key_risk: 'DOJ 반독점 소송 진행 중. 검색 시장점유율 AI 챗봇에 위협.',
+    key_oppty: 'Cloud +48% 가속. Waymo 자율주행. Gemini AI 수익화.',
+    event_date: null, // 다음 실적 발표일
+    // 역사 PE (초기값, Yahoo Finance에서 자동 갱신)
+    pe_hist_avg_5y: 23.5, pe_hist_avg_10y: 22.3,
+    pe_hist_min_5y: 17.2, pe_hist_max_5y: 36.1,
+  },
+
+  TSLA: {
+    name: '테슬라', nameEn: 'Tesla Inc.', flag: '🇺🇸',
+    sector: 'EV·로보틱스', type: 'locked',
+    exchange: 'NASDAQ',
+    locked_note: '10년 장기 보유 예외 종목',
+    fair_value: 463, fair_low: 200, fair_high: 950,
+    eps_ttm: 1.8, revenue_ttm: 97.7e9,
+    revenue_per_share: 31.5, bvps: 18.6,
+    fcf_annual: 1.4e9, sbc_annual: 5.4e9,
+    shares_out: 3.2e9, net_cash: 18e9,
+    piotroski: 6, beneish_m: -1.9, altman_z: 4.2,
+    roic: 11.2, wacc: 13.0,
+    guru_cost: null, guru_note: '로보택시·옵티머스 논제',
+    segments: [
+      { name: '자동차 판매', pct: 80, growth: 6.0, trend: 'stable' },
+      { name: '에너지·Megapack', pct: 10, growth: 45.0, trend: 'accel' },
+      { name: 'FSD·서비스', pct: 10, growth: 51.0, trend: 'accel' },
+    ],
+    pe_hist_avg_5y: 58.0, pe_hist_avg_10y: null,
+  },
+
+  AAPL: {
+    name: '애플', nameEn: 'Apple Inc.', flag: '🇺🇸',
+    sector: '소비자 기술', type: 'portfolio',
+    exchange: 'NASDAQ',
+    fair_value: 322, fair_low: 260, fair_high: 420,
+    eps_ttm: 8.27, revenue_ttm: 391e9,
+    revenue_per_share: 25.8, bvps: 4.2,
+    fcf_annual: 102e9, sbc_annual: 11.7e9,
+    shares_out: 15.1e9, net_cash: -68e9,
+    piotroski: 7, beneish_m: -2.4, altman_z: 5.8,
+    roic: 54.3, wacc: 9.5,
+    mom_12_1: 12.3, erv_score: 0.15,
+    rev_growth_yoy: 5.1, gross_margin: 46.2, gm_trend: 0.8,
+    guru_cost: 165, guru_cost_type: '확인값(추정)',
+    guru_note: '버핏 21.99% 보유. 비중 서서히 축소 중.',
+    segments: [
+      { name: 'iPhone', pct: 52, growth: 1.0, trend: 'stable' },
+      { name: 'Services', pct: 28, growth: 13.0, trend: 'accel' },
+      { name: 'Mac', pct: 10, growth: 2.0, trend: 'stable' },
+      { name: 'iPad', pct: 6, growth: -5.0, trend: 'down' },
+      { name: '웨어러블', pct: 4, growth: -7.0, trend: 'down' },
+    ],
+    geo: [
+      { name: '미국', pct: 44 }, { name: '유럽', pct: 23 },
+      { name: '중화권', pct: 17 }, { name: '기타', pct: 16 },
+    ],
+    key_risk: 'DOJ 앱스토어 반독점. EU DMA 규제. 중화권 관세 리스크.',
+    key_oppty: 'Apple Intelligence 업그레이드 사이클. Services 마진 75%+.',
+    pe_hist_avg_5y: 28.2, pe_hist_avg_10y: 22.1,
+    pe_hist_min_5y: 18.5, pe_hist_max_5y: 44.0,
+  },
+
+  AMZN: {
+    name: '아마존', nameEn: 'Amazon.com', flag: '🇺🇸',
+    sector: '클라우드·이커머스', type: 'portfolio',
+    exchange: 'NASDAQ',
+    fair_value: 296, fair_low: 215, fair_high: 415,
+    eps_ttm: 5.53, revenue_ttm: 638e9,
+    revenue_per_share: 59.8, bvps: 26.1,
+    fcf_annual: 1.2e9, sbc_annual: 24e9, // CapEx로 FCF 압박
+    shares_out: 10.7e9, net_cash: -58e9,
+    piotroski: 7, beneish_m: -1.8, altman_z: 3.2,
+    roic: 16.8, wacc: 10.2,
+    mom_12_1: 8.2, erv_score: 0.22,
+    rev_growth_yoy: 11.5, gross_margin: 48.2, gm_trend: 2.1,
+    guru_cost: 209, guru_cost_type: '역산 추정',
+    guru_note: '애크먼+테퍼 동시 매수 $209 (Q1 2026)',
+    segments: [
+      { name: 'AWS', pct: 15, growth: 28.0, trend: 'accel' },
+      { name: '북미 리테일', pct: 42, growth: 5.0, trend: 'stable' },
+      { name: '광고', pct: 9, growth: 19.0, trend: 'accel' },
+      { name: '구독(Prime)', pct: 7, growth: 8.0, trend: 'stable' },
+      { name: '해외', pct: 27, growth: 9.0, trend: 'stable' },
+    ],
+    key_risk: 'CapEx $200B으로 FCF 소멸. 규제 압박(EU·FTC).',
+    key_oppty: '2027년 CapEx 사이클 종료 후 FCF 폭발적 회복 예상.',
+    pe_hist_avg_5y: 52.1, pe_hist_avg_10y: 85.3,
+  },
+
+  AVGO: {
+    name: '브로드컴', nameEn: 'Broadcom Inc.', flag: '🇺🇸',
+    sector: 'AI 반도체', type: 'portfolio',
+    exchange: 'NASDAQ',
+    fair_value: 524, fair_low: 380, fair_high: 720,
+    eps_ttm: 7.26, revenue_ttm: 51.6e9,
+    revenue_per_share: 10.8, bvps: 8.2,
+    fcf_annual: 22e9, sbc_annual: 3.2e9,
+    shares_out: 4.74e9, net_cash: -60e9,
+    piotroski: 7, beneish_m: -2.0, altman_z: 2.8,
+    roic: 22.1, wacc: 9.8,
+    mom_12_1: 22.1, erv_score: 0.35,
+    rev_growth_yoy: 38.4, gross_margin: 69.0, gm_trend: 1.8,
+    guru_cost: 310, guru_cost_type: '역산 추정',
+    guru_note: '드러켄밀러 Q1 신규 196K주. Apollo $350억 투자.',
+    segments: [
+      { name: 'AI 커스텀칩(XPU)', pct: 21, growth: 143.0, trend: 'accel' },
+      { name: '반도체(기타)', pct: 32, growth: 8.0, trend: 'stable' },
+      { name: 'VMware 소프트웨어', pct: 47, growth: 9.0, trend: 'stable' },
+    ],
+    event_date: '2026-09-03', // 다음 분기 실적
+    key_risk: '소프트웨어 세그먼트 성장 둔화 우려. VMware 통합 리스크.',
+    key_oppty: 'Google·Meta AI칩 수요. Q3 가이던스 $294억(+84% YoY).',
+    pe_hist_avg_5y: 38.2, pe_hist_avg_10y: 32.1,
+  },
+
+  COIN: {
+    name: '코인베이스', nameEn: 'Coinbase Global', flag: '🇺🇸',
+    sector: '크립토 인프라', type: 'portfolio',
+    exchange: 'NASDAQ',
+    fair_value: 197, fair_low: 70, fair_high: 420,
+    eps_ttm: -0.52, revenue_ttm: 7.2e9,
+    revenue_per_share: 17.4, bvps: 14.2,
+    fcf_annual: 1.8e9, sbc_annual: 0.8e9,
+    shares_out: 0.415e9, net_cash: 8e9,
+    piotroski: 5, beneish_m: -1.6, altman_z: null,
+    roic: 8.2, wacc: 12.0,
+    mom_12_1: -8.4, erv_score: -0.15,
+    rev_growth_yoy: 28.5, gross_margin: 42.1, gm_trend: -0.5,
+    guru_cost: 175, guru_cost_type: '평단 추정',
+    guru_note: 'GENIUS Act 스테이블코인 구조적 성장 논제 유효.',
+    segments: [
+      { name: '거래 수수료', pct: 50, growth: 25.0, trend: 'volatile' },
+      { name: '스테이블코인(USDC)', pct: 19, growth: 48.0, trend: 'accel' },
+      { name: '블록체인 서비스', pct: 15, growth: 35.0, trend: 'accel' },
+      { name: '기타', pct: 16, growth: 10.0, trend: 'stable' },
+    ],
+    key_risk: 'BTC $60K 이탈. 거래량 사이클 의존. Visa·Mastercard 스테이블코인 경쟁.',
+    key_oppty: '스테이블코인 GENIUS Act 법제화. 기관 채택 가속.',
+    pe_hist_avg_5y: null,
+  },
+
+  IREN: {
+    name: '아이렌', nameEn: 'IREN Ltd', flag: '🇦🇺',
+    sector: 'AI클라우드·BTC채굴', type: 'portfolio',
+    exchange: 'NASDAQ',
+    fair_value: 78, fair_low: 20, fair_high: 150,
+    eps_ttm: -0.8, revenue_ttm: 0.18e9,
+    revenue_per_share: 0.52, bvps: 2.1,
+    fcf_annual: -0.05e9, sbc_annual: 0.02e9,
+    shares_out: 0.345e9, net_cash: 0.5e9,
+    piotroski: 4, beneish_m: null, altman_z: null,
+    roic: -5.2, wacc: 15.0,
+    mom_12_1: 45.2, erv_score: 0.1,
+    rev_growth_yoy: 95.0, gross_margin: 28.0, gm_trend: 3.2,
+    rule_of_40: -12, // 적자로 Rule of 40 낮음
+    guru_cost: 45, guru_cost_type: '추정 평균',
+    guru_note: 'Cantor Fitzgerald 목표가 $99. MS $36억 계약. Dell Blackwell.',
+    segments: [
+      { name: 'AI GPU-as-a-Service', pct: 55, growth: 180.0, trend: 'accel' },
+      { name: 'BTC 채굴', pct: 45, growth: 30.0, trend: 'volatile' },
+    ],
+    key_risk: 'BTC -60% 시 주가 -70% 가능. 고위험. AI 버블 리스크.',
+    key_oppty: 'AI GPU 수요 폭발. MS·Dell 대형 계약.',
+    pe_hist_avg_5y: null,
+  },
+
+  NTRA: {
+    name: '나테라', nameEn: 'Natera Inc.', flag: '🇺🇸',
+    sector: '헬스케어·진단', type: 'portfolio',
+    exchange: 'NASDAQ',
+    fair_value: 249, fair_low: 122, fair_high: 390,
+    eps_ttm: -2.1, revenue_ttm: 2.6e9,
+    revenue_per_share: 10.8, bvps: 3.4,
+    fcf_annual: 0.1e9, sbc_annual: 0.18e9,
+    shares_out: 0.241e9, net_cash: 1.2e9,
+    piotroski: 7, beneish_m: -2.3, altman_z: null,
+    roic: -4.8, wacc: 11.5,
+    mom_12_1: 12.8, erv_score: 0.41,
+    rev_growth_yoy: 39.0, gross_margin: 62.0, gm_trend: 5.1,
+    rule_of_40: 34, // 적자지만 62+39=101은 매출총이익+성장 기준
+    tam_penetration: 3.2, // TAM 대비 침투율 %
+    guru_cost: 86, guru_cost_type: '역산 추정(4년평균)',
+    guru_note: '드러켄밀러 4년 18.1% 보유. 코트+1446%. 공매도 15%+.',
+    segments: [
+      { name: 'Signatera(암재발)', pct: 45, growth: 54.0, trend: 'accel' },
+      { name: 'Panorama(산전)', pct: 40, growth: 25.0, trend: 'stable' },
+      { name: 'Prospera(이식)', pct: 15, growth: 38.0, trend: 'accel' },
+    ],
+    key_risk: 'GAAP 적자. 보험 커버 리스크. Guardant Health 경쟁.',
+    key_oppty: '첫 1분기 100만건 돌파. 일본 진출 2026. FCF 흑자 전환.',
+    pe_hist_avg_5y: null,
+    // 텐베거 지표
+    ten_bagger_score: 82,
+    ten_narrative: 'Signatera가 21세기 PSA 검사 표준이 된다면 TAM $300억+ 중 현재 침투율 3%. 드러켄밀러 4년 보유가 이 논리 확인.',
+  },
+
+  // ── 트래킹 종목 ───────────────────────────────────
+  NVDA: {
+    name: '엔비디아', nameEn: 'NVIDIA Corp.', flag: '🇺🇸',
+    sector: 'AI 반도체', type: 'watch',
+    exchange: 'NASDAQ',
+    fair_value: 268, fair_low: 152, fair_high: 390,
+    eps_ttm: 3.58, revenue_ttm: 113e9,
+    revenue_per_share: 4.62, bvps: 2.8,
+    fcf_annual: 61e9, sbc_annual: 4.8e9,
+    shares_out: 24.4e9, net_cash: 34e9,
+    piotroski: 8, beneish_m: -2.5, altman_z: 12.1,
+    roic: 62.5, wacc: 10.5,
+    mom_12_1: 28.4, erv_score: 0.58,
+    rev_growth_yoy: 82.0, gross_margin: 75.0, gm_trend: 2.8,
+    rule_of_40: 75,
+    guru_cost: 185, guru_cost_type: '역산 추정',
+    guru_note: 'CUDA 독점 해자. Blackwell 램프업. ATH 근처 주의.',
+    segments: [
+      { name: '데이터센터', pct: 87, growth: 95.0, trend: 'accel' },
+      { name: '게이밍', pct: 9, growth: 8.0, trend: 'stable' },
+      { name: '자동차·기타', pct: 4, growth: 25.0, trend: 'accel' },
+    ],
+    key_risk: 'ATH 근처. AMD·자체칩(TPU·XPU) 경쟁. CapEx 삭감 리스크.',
+    key_oppty: 'Rubin 차세대 칩. 로보틱스 AI 추가 수요.',
+    pe_hist_avg_5y: 52.1, pe_hist_avg_10y: 38.4,
+  },
+
+  META: {
+    name: '메타', nameEn: 'Meta Platforms', flag: '🇺🇸',
+    sector: '소셜·AI', type: 'watch',
+    exchange: 'NASDAQ',
+    fair_value: 694, fair_low: 396, fair_high: 960,
+    eps_ttm: 23.6, revenue_ttm: 164.5e9,
+    revenue_per_share: 64.2, bvps: 52.1,
+    fcf_annual: 52e9, sbc_annual: 15e9,
+    shares_out: 2.56e9, net_cash: 42e9,
+    piotroski: 8, beneish_m: -2.1, altman_z: 9.2,
+    roic: 34.2, wacc: 9.8,
+    mom_12_1: -8.1, erv_score: 0.28,
+    rev_growth_yoy: 22.5, gross_margin: 81.0, gm_trend: 1.2,
+    rule_of_40: 81,
+    guru_cost: 650, guru_cost_type: '역산 추정',
+    guru_note: '애크먼 Q1 신규. 뢰브 Q1 신규. ATH $796 대비 -28%.',
+    segments: [
+      { name: 'Facebook·Instagram 광고', pct: 80, growth: 20.0, trend: 'stable' },
+      { name: 'WhatsApp·기타', pct: 17, growth: 28.0, trend: 'accel' },
+      { name: 'Reality Labs', pct: 3, growth: -5.0, trend: 'down' },
+    ],
+    key_risk: 'Reality Labs 연 -$50억. CapEx $60~65B 부담. EU 규제.',
+    key_oppty: 'AI 광고 효율 +20%. Llama 오픈소스 생태계. Threads.',
+    pe_hist_avg_5y: 22.8, pe_hist_avg_10y: 19.2,
+  },
+
+  MSFT: {
+    name: '마이크로소프트', nameEn: 'Microsoft Corp.', flag: '🇺🇸',
+    sector: '클라우드·AI', type: 'watch',
+    exchange: 'NASDAQ',
+    fair_value: 479, fair_low: 310, fair_high: 646,
+    eps_ttm: 13.1, revenue_ttm: 261e9,
+    revenue_per_share: 35.1, bvps: 28.4,
+    fcf_annual: 74e9, sbc_annual: 9.8e9,
+    shares_out: 7.44e9, net_cash: 28e9,
+    piotroski: 8, beneish_m: -2.4, altman_z: 8.9,
+    roic: 25.8, wacc: 9.2,
+    mom_12_1: 5.2, erv_score: 0.32,
+    rev_growth_yoy: 15.8, gross_margin: 70.0, gm_trend: 0.8,
+    rule_of_40: 71,
+    guru_cost: 435.22, guru_cost_type: '확인값',
+    guru_note: '애크먼 Q1 2026 신규 매수 $435.22 확인됨. 15.26% 비중.',
+    segments: [
+      { name: 'Azure·클라우드', pct: 35, growth: 40.0, trend: 'accel' },
+      { name: 'Office·Copilot', pct: 30, growth: 12.0, trend: 'stable' },
+      { name: 'Xbox·기타', pct: 35, growth: 8.0, trend: 'stable' },
+    ],
+    key_risk: 'OpenAI 독점 관계 변화 리스크. 높은 밸류에이션.',
+    key_oppty: 'Azure +40%. Copilot $50→구독 인상. AI 에이전트 Enterprise.',
+    pe_hist_avg_5y: 33.2, pe_hist_avg_10y: 28.8,
+  },
+
+  ORCL: {
+    name: '오라클', nameEn: 'Oracle Corp.', flag: '🇺🇸',
+    sector: '클라우드·DB', type: 'watch',
+    exchange: 'NYSE',
+    fair_value: 240, fair_low: 147, fair_high: 320,
+    eps_ttm: 8.05, revenue_ttm: 67.4e9,
+    revenue_per_share: 23.8, bvps: -4.2, // 부채 많아 음수
+    fcf_annual: -5e9, sbc_annual: 5e9, // CapEx로 FCF 마이너스
+    shares_out: 2.84e9, net_cash: -135e9,
+    piotroski: 6, beneish_m: -1.9, altman_z: null,
+    roic: 18.5, wacc: 9.0,
+    mom_12_1: 8.8, erv_score: 0.25,
+    rev_growth_yoy: 17.2, gross_margin: 71.0, gm_trend: 0.4,
+    guru_cost: 206, guru_cost_type: '역산 추정',
+    guru_note: 'RPO $6,380억. AI계약 $670억/분기. FY27 $900억 가이던스.',
+    segments: [
+      { name: 'OCI 클라우드', pct: 20, growth: 84.0, trend: 'accel' },
+      { name: '클라우드 서비스', pct: 35, growth: 25.0, trend: 'accel' },
+      { name: '라이선스·서포트', pct: 40, growth: 3.0, trend: 'stable' },
+      { name: '하드웨어', pct: 5, growth: -8.0, trend: 'down' },
+    ],
+    key_risk: '부채 $1,350억. CapEx 사이클로 FCF 마이너스. 신용 리스크.',
+    key_oppty: 'RPO $6,380억 = 매출의 9.5배. AI 인프라 수요 폭발.',
+    pe_hist_avg_5y: 28.4, pe_hist_avg_10y: 22.1,
+    event_date: '2026-09-09',
+  },
+
+  VRT: {
+    name: '버티브', nameEn: 'Vertiv Holdings', flag: '🇺🇸',
+    sector: 'AI 인프라(전력·냉각)', type: 'watch',
+    exchange: 'NYSE',
+    fair_value: 419, fair_low: 210, fair_high: 620,
+    eps_ttm: 2.85, revenue_ttm: 10.2e9,
+    revenue_per_share: 7.72, bvps: 8.4,
+    fcf_annual: 1.2e9, sbc_annual: 0.15e9,
+    shares_out: 1.32e9, net_cash: -4e9,
+    piotroski: 7, beneish_m: -2.0, altman_z: 3.1,
+    roic: 18.2, wacc: 10.8,
+    mom_12_1: 18.2, erv_score: 0.44,
+    rev_growth_yoy: 30.0, gross_margin: 38.0, gm_trend: 2.1,
+    rule_of_40: 42,
+    guru_cost: 355, guru_cost_type: '추정',
+    guru_note: '백로그 $150억(+109% YoY). FY26 $135~140억 가이던스.',
+    segments: [
+      { name: '제품(전력·냉각)', pct: 70, growth: 35.0, trend: 'accel' },
+      { name: '서비스', pct: 30, growth: 18.0, trend: 'stable' },
+    ],
+    key_risk: 'AI CapEx 삭감 시 수요 감소. 경쟁사 가격 공세.',
+    key_oppty: 'AI 데이터센터 불가침 인프라. 백로그 2년치 이상.',
+    pe_hist_avg_5y: 32.1, pe_hist_avg_10y: null,
+  },
+
+  MU: {
+    name: '마이크론', nameEn: 'Micron Technology', flag: '🇺🇸',
+    sector: 'HBM 메모리', type: 'watch',
+    exchange: 'NASDAQ',
+    fair_value: 937, fair_low: 500, fair_high: 1490,
+    eps_ttm: 9.18, revenue_ttm: 58.1e9,
+    revenue_per_share: 52.5, bvps: 38.2,
+    fcf_annual: 8e9, sbc_annual: 0.8e9,
+    shares_out: 1.11e9, net_cash: 8e9,
+    piotroski: 7, beneish_m: -1.8, altman_z: 4.8,
+    roic: 15.2, wacc: 10.5,
+    mom_12_1: 42.1, erv_score: 0.48,
+    rev_growth_yoy: 45.0, gross_margin: 38.0, gm_trend: 8.2,
+    guru_cost: 850, guru_cost_type: '추정',
+    guru_note: '3주 전 $757에서 $1,035로 +37% 급등. 기대값 이미 초과.',
+    segments: [
+      { name: 'DRAM(HBM포함)', pct: 65, growth: 55.0, trend: 'accel' },
+      { name: 'NAND', pct: 30, growth: 28.0, trend: 'stable' },
+      { name: '기타', pct: 5, growth: 10.0, trend: 'stable' },
+    ],
+    key_risk: '반도체 사이클. 삼성 HBM 램프업. 현재 기대값 초과 고평가.',
+    key_oppty: 'HBM4 독점. AI 메모리 수요 장기 강세.',
+    pe_hist_avg_5y: 28.4, pe_hist_avg_10y: null,
+  },
+};
+
+// ── 구루 포지션 (Q1 2026 13F 기준) ──────────────
+export const GURU_POSITIONS = [
+  {
+    id: 'ackman', name: '빌 애크먼', fund: 'Pershing Square', tier: 1,
+    updated: '2026 Q1', aum_b: 18.5,
+    positions: [
+      { sym: 'MSFT', action: 'NEW', shares: '565만주', weight_pct: 15.26,
+        cost_est: 435.22, cost_type: '확인값',
+        note: '21배 선행PER 진입, 지금 8.8% 저렴' },
+      { sym: 'AMZN', action: 'ADD', shares: '1,145만주 (+19%)', weight_pct: 17.39,
+        cost_est: 209, cost_type: '역산 추정',
+        note: '애크먼+테퍼 동시 매수, 현재 30% 비쌈' },
+      { sym: 'META', action: 'HOLD', shares: '266만주', weight_pct: 11.37,
+        cost_est: 650, cost_type: '역산 추정',
+        note: '현재 $570으로 애크먼보다 12% 저렴' },
+    ],
+  },
+  {
+    id: 'druckenmiller', name: '드러켄밀러', fund: 'Duquesne Family Office', tier: 2,
+    updated: '2026 Q1', aum_b: 3.38,
+    positions: [
+      { sym: 'NTRA', action: 'HOLD', shares: '340만주', weight_pct: 18.1,
+        cost_est: 86, cost_type: '역산 추정(4년)',
+        note: '4년 보유 +126%. 최강 신뢰 신호.' },
+      { sym: 'AVGO', action: 'NEW', shares: '195,955주', weight_pct: 3.5,
+        cost_est: 310, cost_type: '역산 추정',
+        note: 'Q1 신규 $310 매수, 현재 $388 = +25%' },
+      { sym: 'GOOGL', action: 'SOLD', shares: '전량 매도', weight_pct: 0,
+        cost_est: 397, cost_type: '역산 추정(매도가)',
+        note: '단기 매크로 관점 이탈. 버크셔는 반대로 매수.' },
+    ],
+  },
+  {
+    id: 'berkshire', name: '워런 버핏(아벨)', fund: 'Berkshire Hathaway', tier: 1,
+    updated: '2026 Q1', aum_b: 342,
+    positions: [
+      { sym: 'AAPL', action: 'REDUCE', shares: '3.0억주 (축소 중)', weight_pct: 21.99,
+        cost_est: 165, cost_type: '역산 추정',
+        note: '비중 서서히 축소. 보험 목적 보유 지속.' },
+      { sym: 'GOOGL', action: 'NEW', shares: '6월 $100억 신규', weight_pct: null,
+        cost_est: 390, cost_type: '역산 추정',
+        note: '그렉 아벨 첫 빅테크 베팅. 현재 $356으로 저렴.' },
+    ],
+  },
+  {
+    id: 'tepper', name: '데이비드 테퍼', fund: 'Appaloosa Mgmt', tier: 2,
+    updated: '2026 Q1', aum_b: 14.2,
+    positions: [
+      { sym: 'AMZN', action: 'ADD', shares: '430만주 (+98%)', weight_pct: 15.2,
+        cost_est: 209, cost_type: '역산 추정',
+        note: '애크먼과 동시 동일 가격 매수. 강한 클러스터.' },
+      { sym: 'META', action: 'HOLD', shares: '180만주', weight_pct: 9.8,
+        cost_est: 580, cost_type: '역산 추정',
+        note: '현재 $570으로 테퍼 매수가 근처.' },
+    ],
+  },
+];
+
+// ── 매크로 설정 (FRED로 자동, 아래는 초기값) ─────
+export const MACRO_INIT = {
+  fed_rate: 3.75,
+  treasury_10y: 4.42,
+  sp500: 7420,
+  sp500_dcf_fair: 7180,
+  shiller_cape: 37,
+  buffett_indicator: 196,
+  ism_pmi: 48.9,
+  dxy: 105,
+  usd_krw: 1384,
+  cpi_yoy: 3.1,
+  regime: '후기사이클',
+  regime_detail: '금리 고점 유지 + AI 섹터 강세',
+  stock_cash_ratio: 60,
+  updated: '2026-06-27',
+};
+
+// ── 방법론 가중치 (학술 검증) ─────────────────────
+export const METHOD_WEIGHTS = {
+  reverse_dcf: 0.18,    // Mauboussin-Rappaport
+  ev_ebitda: 0.10,      // 섹터 상대 평가
+  fcf_yield: 0.07,      // 국채 대비 절대 매력
+  other_val: 0.05,      // PEG, EPV, SOTP
+  piotroski: 0.18,      // Piotroski 2000 +7.5%p
+  beneish: 0.10,        // 조작 탐지 게이트키퍼
+  roic_wacc: 0.07,      // 가치 창출 능력
+  momentum: 0.10,       // Jegadeesh-Titman 1993
+  erv: 0.07,            // 어닝 리비전 모멘텀
+  guru_13f: 0.08,       // Cohen et al. 2010 +6%p
+};
