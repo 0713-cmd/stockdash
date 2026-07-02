@@ -287,6 +287,54 @@ export function calcPortfolioStats(trades, currentPrices) {
   return { positions, total_cost: totalCost, total_value: totalValue, total_return };
 }
 
+// ── 재무 추이 재구성 (분기 8개 + 연간 5개) ───────
+// 주의: 실제 공시 수치가 아니라 revenue_ttm/gross_margin/rev_growth_yoy 등
+// 현재 스냅샷 값으로부터 역산 재구성한 "추정 추이"입니다. 절대값보다 방향성(추세) 참고용.
+export function genFinancialHistory(stock) {
+  const { revenue_ttm, gross_margin, rev_growth_yoy, rev_growth_accel, fcf_annual, sbc_annual } = stock;
+  if (!revenue_ttm) return null;
+
+  const baseQRev = revenue_ttm / 4;
+  const qGrowth = (rev_growth_yoy || 8) / 100;      // 최근 YoY 성장률
+  const accel = (rev_growth_accel || 0) / 100 / 4;   // 분기당 가속도(완만 적용)
+  const baseGM = gross_margin || 45;
+  const gmTrendQ = (stock.gm_trend || 0) / 4;
+
+  // 8개 분기(최근이 마지막) 역산: 최근 분기가 baseQRev, 과거로 갈수록 YoY 성장률 역산
+  const quarters = [];
+  for (let i = 7; i >= 0; i--) {
+    const yearsBack = i / 4;
+    const growthDecay = qGrowth - accel * i; // 과거로 갈수록 성장률이 accel만큼 낮았다고 가정
+    const rev = baseQRev / Math.pow(1 + Math.max(growthDecay, -0.3), yearsBack);
+    const gm = Math.max(5, baseGM - gmTrendQ * i);
+    const opMargin = Math.max(-20, gm - 28); // 대략적인 영업비용률 가정(설명용 근사)
+    quarters.push({
+      label: `Q${4 - (i % 4)}`,
+      idx: 7 - i,
+      revenue: rev,
+      grossMargin: gm,
+      opMargin,
+    });
+  }
+
+  // 연간 5개년 (최근 FY가 revenue_ttm 근사)
+  const annualGrowth = qGrowth;
+  const annual = [];
+  for (let y = 4; y >= 0; y--) {
+    const rev = revenue_ttm / Math.pow(1 + Math.max(annualGrowth - (rev_growth_accel || 0) / 100 * y * 0.3, -0.25), y);
+    const fcf = (fcf_annual || rev * 0.12) / Math.pow(1 + Math.max(annualGrowth - 0.03, -0.2), y);
+    const ocf = fcf + (sbc_annual || rev * 0.03) * (1 - y * 0.05);
+    annual.push({
+      label: `FY${new Date().getFullYear() - y - 1}`,
+      revenue: rev,
+      fcf,
+      ocf,
+    });
+  }
+
+  return { quarters, annual, estimated: true };
+}
+
 // ── 손절·익절 경보 ──────────────────────────────
 export function checkAlerts(stock, currentPrice, avgCost) {
   const alerts = [];

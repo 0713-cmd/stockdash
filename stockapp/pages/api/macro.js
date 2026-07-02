@@ -1,15 +1,14 @@
 // pages/api/macro.js
-// FRED API — 연준 공식 데이터, 완전 무료
-// 기본 시리즈는 키 없이 접근 가능
+// FRED API — 연준 공식 데이터. 키 없으면 정적 MACRO_INIT 값을 그대로 사용.
 
 const FRED_BASE = 'https://api.stlouisfed.org/fred/series/observations';
-const FRED_KEY = process.env.FRED_KEY || 'abcdefghijklmnopqrstuvwxyz123456'; // 무료 키
+const FRED_KEY = process.env.FRED_KEY || null;
 
 const SERIES = {
-  treasury_10y: 'DGS10',    // 10년 국채금리
-  fed_rate: 'FEDFUNDS',     // 기준금리
-  cpi_yoy: 'CPIAUCSL',      // CPI
-  usd_krw: 'DEXKOUS',       // 달러/원
+  treasury_10y: 'DGS10',
+  fed_rate: 'FEDFUNDS',
+  cpi_yoy: 'CPIAUCSL',
+  usd_krw: 'DEXKOUS',
 };
 
 async function fetchFRED(seriesId) {
@@ -24,6 +23,12 @@ async function fetchFRED(seriesId) {
 export default async function handler(req, res) {
   res.setHeader('Cache-Control', 's-maxage=3600, stale-while-revalidate=7200');
 
+  // FRED_KEY가 설정되지 않았으면 외부 호출 없이 바로 반환 (프론트에서 MACRO_INIT과 병합)
+  if (!FRED_KEY) {
+    res.status(200).json({ macro: {}, note: 'FRED_KEY 미설정 — 정적 기본값 사용' });
+    return;
+  }
+
   try {
     const [treasury10y, fedRate, cpi, usdKrw] = await Promise.allSettled([
       fetchFRED(SERIES.treasury_10y),
@@ -32,18 +37,14 @@ export default async function handler(req, res) {
       fetchFRED(SERIES.usd_krw),
     ]);
 
-    const macro = {
-      treasury_10y: treasury10y.status === 'fulfilled' ? treasury10y.value : null,
-      fed_rate: fedRate.status === 'fulfilled' ? fedRate.value : null,
-      cpi: cpi.status === 'fulfilled' ? cpi.value : null,
-      usd_krw: usdKrw.status === 'fulfilled' ? usdKrw.value : null,
-      fetched: new Date().toISOString(),
-    };
+    const macro = {};
+    if (treasury10y.status === 'fulfilled' && treasury10y.value != null) macro.treasury_10y = treasury10y.value;
+    if (fedRate.status === 'fulfilled' && fedRate.value != null) macro.fed_rate = fedRate.value;
+    if (usdKrw.status === 'fulfilled' && usdKrw.value != null) macro.usd_krw = usdKrw.value;
+    macro.fetched = new Date().toISOString();
 
-    // 계산 지표
-    // S&P 500은 Yahoo Finance에서 별도 가져옴 ('^GSPC')
     res.status(200).json({ macro });
   } catch (e) {
-    res.status(200).json({ macro: null, error: e.message });
+    res.status(200).json({ macro: {}, error: e.message });
   }
 }
