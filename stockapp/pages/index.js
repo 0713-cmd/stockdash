@@ -80,14 +80,21 @@ export default function App() {
         </div>
 
         <div style={{flex:1,overflowY:'auto',overflowX:'hidden',WebkitOverflowScrolling:'touch',paddingBottom:'calc(60px + env(safe-area-inset-bottom))'}}>
-          {detail?.type==='stock' && <StockDetail sym={detail.sym} prices={prices} macro={macro} macroValues={macroValues} onBack={closeDetail}/>}
-          {detail?.type==='macro' && <MacroDetail mkey={detail.key} value={macroValues[detail.key]} onBack={closeDetail}/>}
-
-          {!detail && tab==='home'      && <HomePage prices={prices} loading={loading} macro={macro} openStock={openStock} openMacro={openMacro} goTab={goTab}/>}
-          {!detail && tab==='stocks'    && <StocksPage prices={prices} loading={loading} macro={macro} openStock={openStock}/>}
-          {!detail && tab==='ten'       && <TenBaggerPage prices={prices} openStock={openStock}/>}
-          {!detail && tab==='macroguru' && <MacroGuruPage macro={macro} prices={prices} openMacro={openMacro}/>}
-          {!detail && tab==='portfolio' && <PortfolioJournalPage prices={prices} trades={trades} setTrades={setTrades} journal={journal} setJournal={setJournal}/>}
+          {detail && (
+            <div style={{maxWidth:820,margin:'0 auto',width:'100%'}}>
+              {detail.type==='stock' && <StockDetail sym={detail.sym} prices={prices} macro={macro} macroValues={macroValues} onBack={closeDetail}/>}
+              {detail.type==='macro' && <MacroDetail mkey={detail.key} value={macroValues[detail.key]} onBack={closeDetail}/>}
+            </div>
+          )}
+          {!detail && (
+            <div style={{maxWidth:1280,margin:'0 auto',width:'100%'}}>
+              {tab==='home'      && <HomePage prices={prices} loading={loading} macro={macro} openStock={openStock} openMacro={openMacro} goTab={goTab}/>}
+              {tab==='stocks'    && <StocksPage prices={prices} loading={loading} macro={macro} openStock={openStock}/>}
+              {tab==='ten'       && <TenBaggerPage prices={prices} openStock={openStock}/>}
+              {tab==='macroguru' && <MacroGuruPage macro={macro} prices={prices} openMacro={openMacro}/>}
+              {tab==='portfolio' && <PortfolioJournalPage prices={prices} trades={trades} setTrades={setTrades} journal={journal} setJournal={setJournal}/>}
+            </div>
+          )}
         </div>
 
         <div style={{position:'fixed',bottom:0,left:0,right:0,height:'calc(60px + env(safe-area-inset-bottom))',paddingBottom:'env(safe-area-inset-bottom)',background:'var(--bg2)',borderTop:'1px solid var(--line2)',display:'flex',alignItems:'flex-start',paddingTop:8,zIndex:100}}>

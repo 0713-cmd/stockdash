@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { STOCK_UNIVERSE } from '../lib/data';
 import { calcTenBaggerScore } from '../lib/calculations';
-import { fmt, pct, ScoreRing, MiniBar } from './shared';
+import { fmt, pct, ScoreRing, MiniBar, CardGrid } from './shared';
 
 export default function TenBaggerPage({ prices, openStock }) {
   const [showAll, setShowAll] = useState(false);
@@ -27,6 +27,7 @@ export default function TenBaggerPage({ prices, openStock }) {
     <div style={{paddingBottom:80}}>
       <div style={{padding:'14px 16px 4px',fontSize:20,fontWeight:700,color:'var(--strong)'}}>🚀 텐베거 TOP{Math.min(10,list.length)}</div>
       <div style={{padding:'0 16px 10px',fontSize:11,color:'var(--dim)'}}>5년 내 10배 가능성 · Rule of 40 / 성장가속 / TAM / GM트렌드 / 품질 합산 · 탭하면 재무 상세</div>
+      <CardGrid min={320}>
       {visible.map((s,idx)=>{
         const col=s.ten>=70?'var(--green)':s.ten>=50?'var(--gold)':'var(--dim2)';
         const pts=[
@@ -37,7 +38,7 @@ export default function TenBaggerPage({ prices, openStock }) {
           {l:'Piotroski', calc:`${s.piotroski??'?'}/9`, g:s.piotPts, m:10},
         ];
         return (
-          <div key={s.sym} style={{margin:'0 12px 8px',background:'var(--bg2)',borderRadius:14,border:`1px solid ${s.ten>=70?'var(--green-bd)':s.ten>=50?'var(--gold-bd)':'var(--line)'}`,overflow:'hidden'}}>
+          <div key={s.sym} style={{background:'var(--bg2)',borderRadius:14,border:`1px solid ${s.ten>=70?'var(--green-bd)':s.ten>=50?'var(--gold-bd)':'var(--line)'}`,overflow:'hidden',display:'flex',flexDirection:'column'}}>
             <div onClick={()=>openStock(s.sym)} style={{padding:'12px 14px',display:'flex',gap:12,alignItems:'center',borderBottom:'1px solid var(--line)',cursor:'pointer'}}>
               <ScoreRing score={s.ten} size={48}/>
               <div style={{flex:1,minWidth:0}}>
@@ -70,8 +71,9 @@ export default function TenBaggerPage({ prices, openStock }) {
           </div>
         );
       })}
+      </CardGrid>
       {!showAll && list.length>10 && (
-        <div onClick={()=>setShowAll(true)} style={{margin:'4px 12px 8px',padding:'10px',textAlign:'center',fontSize:11,color:'var(--gold)',cursor:'pointer',background:'var(--bg2)',borderRadius:10,border:'1px solid var(--gold-bd)'}}>
+        <div onClick={()=>setShowAll(true)} style={{margin:'8px 12px',padding:'10px',textAlign:'center',fontSize:11,color:'var(--gold)',cursor:'pointer',background:'var(--bg2)',borderRadius:10,border:'1px solid var(--gold-bd)'}}>
           나머지 {list.length-10}개 더보기
         </div>
       )}

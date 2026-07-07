@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { MACRO_INIT, GURU_POSITIONS } from '../lib/data';
-import { fmt, computeMacroValues, SectionTitle, MiniBar } from './shared';
+import { fmt, computeMacroValues, SectionTitle, MiniBar, CardGrid } from './shared';
 import { MacroGrid } from './MacroBits';
 
 function Segmented({ value, onChange, options }) {
@@ -24,7 +24,7 @@ function GuruCard({ g, prices }) {
   }[a]||{bg:'var(--bg3)',bd:'var(--line2)',col:'var(--dim2)',l:a});
 
   return (
-    <div style={{margin:'0 12px 10px',background:'var(--bg2)',borderRadius:14,border:`1px solid ${g.tier===1?'var(--gold-bd)':'var(--line2)'}`,overflow:'hidden'}}>
+    <div style={{background:'var(--bg2)',borderRadius:14,border:`1px solid ${g.tier===1?'var(--gold-bd)':'var(--line2)'}`,overflow:'hidden',display:'flex',flexDirection:'column'}}>
       <div style={{padding:'12px 14px',borderBottom:'1px solid var(--line)'}}>
         <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:8}}>
           <div>
@@ -92,7 +92,9 @@ export default function MacroGuruPage({ macro, prices, openMacro }) {
       {seg==='guru' && (
         <>
           <div style={{padding:'0 16px 8px',fontSize:11,color:'var(--dim)'}}>Q1 2026 13F 기준 · 분기 대비 매수/매도 규모로 공격성 판정</div>
-          {GURU_POSITIONS.map(g=><GuruCard key={g.id} g={g} prices={prices}/>)}
+          <CardGrid min={340} gap={10}>
+            {GURU_POSITIONS.map(g=><GuruCard key={g.id} g={g} prices={prices}/>)}
+          </CardGrid>
         </>
       )}
     </div>

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { STOCK_UNIVERSE } from '../lib/data';
 import { calcCompositeSignal, calcPortfolioStats } from '../lib/calculations';
-import { fmt, fmtK, sigCol, sigIcon, SectionTitle } from './shared';
+import { fmt, fmtK, sigCol, sigIcon, SectionTitle, CardGrid } from './shared';
 
 const inp = {width:'100%',background:'var(--bg3)',border:'1px solid var(--line2)',borderRadius:8,padding:'9px 12px',color:'var(--text)',fontSize:13,fontFamily:'inherit',outline:'none'};
 
@@ -46,7 +46,7 @@ function TradesTab({ prices, trades, setTrades }) {
           </div>
         </div>
       )}
-      <div style={{margin:'0 12px 8px',padding:'14px',background:'var(--bg2)',borderRadius:14,border:'1px solid var(--line)'}}>
+      <div style={{margin:'0 12px 8px',padding:'14px',background:'var(--bg2)',borderRadius:14,border:'1px solid var(--line)',maxWidth:560}}>
         <div style={{fontSize:10,color:'var(--dim)',textTransform:'uppercase',letterSpacing:'.1em',marginBottom:8}}>매매 기록 추가</div>
         <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:8}}>
           <div style={{gridColumn:'1/-1'}}><div style={{fontSize:10,color:'var(--dim)',marginBottom:3}}>종목</div><input style={inp} placeholder="GOOGL" value={form.sym} onChange={e=>setForm(f=>({...f,sym:e.target.value.toUpperCase()}))}/></div>
@@ -60,8 +60,9 @@ function TradesTab({ prices, trades, setTrades }) {
       {trades.length>0&&(
         <>
           <SectionTitle>거래 내역 ({trades.length}건)</SectionTitle>
+          <CardGrid min={260}>
           {[...trades].reverse().map((t,i)=>(
-            <div key={t.id||i} style={{margin:'0 12px 5px',padding:'10px 14px',background:'var(--bg2)',borderRadius:12,border:'1px solid var(--line)'}}>
+            <div key={t.id||i} style={{padding:'10px 14px',background:'var(--bg2)',borderRadius:12,border:'1px solid var(--line)'}}>
               <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:3}}>
                 <div style={{display:'flex',gap:6,alignItems:'center'}}>
                   <span className="mono" style={{fontWeight:700,fontSize:13,color:'var(--strong)'}}>{t.sym}</span>
@@ -76,6 +77,7 @@ function TradesTab({ prices, trades, setTrades }) {
               {t.note&&<div style={{fontSize:10,color:'var(--dim)',marginTop:2}}>{t.note}</div>}
             </div>
           ))}
+          </CardGrid>
         </>
       )}
       {trades.length===0&&<div style={{padding:'40px 20px',textAlign:'center',color:'var(--dim)',fontSize:12}}>거래 기록이 없습니다. 첫 매매를 입력해보세요.</div>}
@@ -107,7 +109,7 @@ function JournalTab({ prices, journal, setJournal }) {
 
   return (
     <>
-      <div style={{margin:'0 12px 8px',padding:'14px',background:'var(--bg2)',borderRadius:14,border:'1px solid var(--line)'}}>
+      <div style={{margin:'0 12px 8px',padding:'14px',background:'var(--bg2)',borderRadius:14,border:'1px solid var(--line)',maxWidth:560}}>
         <div style={{fontSize:10,color:'var(--dim)',textTransform:'uppercase',letterSpacing:'.1em',marginBottom:8}}>새 기록</div>
         <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:8}}>
           <div><div style={{fontSize:10,color:'var(--dim)',marginBottom:3}}>종목(선택)</div><input style={inp} placeholder="GOOGL" value={form.sym} onChange={e=>setForm(f=>({...f,sym:e.target.value.toUpperCase()}))}/></div>
@@ -129,8 +131,9 @@ function JournalTab({ prices, journal, setJournal }) {
           </div>
         </div>
       )}
+      <CardGrid min={300}>
       {journal.map((e,i)=>(
-        <div key={e.id||i} style={{margin:'0 12px 6px',padding:'12px 14px',background:'var(--bg2)',borderRadius:12,border:'1px solid var(--line)'}}>
+        <div key={e.id||i} style={{padding:'12px 14px',background:'var(--bg2)',borderRadius:12,border:'1px solid var(--line)'}}>
           <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:6}}>
             <div style={{display:'flex',gap:6,alignItems:'center'}}>
               {e.sym&&<span className="mono" style={{fontWeight:700,fontSize:13,color:'var(--strong)'}}>{e.sym}</span>}
@@ -150,6 +153,7 @@ function JournalTab({ prices, journal, setJournal }) {
           )}
         </div>
       ))}
+      </CardGrid>
       {journal.length===0&&<div style={{padding:'40px 20px',textAlign:'center',color:'var(--dim)',fontSize:12}}>일지가 없습니다. 매매 이유를 기록해보세요.</div>}
     </>
   );

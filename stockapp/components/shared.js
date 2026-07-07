@@ -168,6 +168,15 @@ export function MiniBar({ pct: p, col }) {
   return <div style={{height:3,background:'var(--bg4)',borderRadius:2}}><div style={{height:'100%',width:`${Math.max(0,Math.min(100,p))}%`,background:col||'var(--gold)',borderRadius:2}}/></div>;
 }
 
+// 반응형 카드 그리드 — 데스크톱 4열, 태블릿 2~3열, 모바일 1~2열
+export function CardGrid({ children, min = 230, gap = 8 }) {
+  return (
+    <div style={{display:'grid',gridTemplateColumns:`repeat(auto-fill,minmax(${min}px,1fr))`,gap,margin:'0 12px'}}>
+      {children}
+    </div>
+  );
+}
+
 export function SectionTitle({ children, right }) {
   return (
     <div style={{padding:'10px 16px 5px',display:'flex',justifyContent:'space-between',alignItems:'center'}}>

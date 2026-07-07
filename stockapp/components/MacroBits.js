@@ -101,7 +101,7 @@ export function MacroDetail({ mkey, value, onBack }) {
 export function MacroGrid({ values, onOpen }) {
   const keys = ['fed_rate','shiller_cape','buffett_indicator','ism_pmi','cpi_yoy','dxy','fed_model'];
   return (
-    <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:8,margin:'0 12px'}}>
+    <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(150px,1fr))',gap:8,margin:'0 12px'}}>
       {keys.map(k=><MacroCard key={k} mkey={k} value={values[k]} onClick={()=>onOpen(k)}/>)}
     </div>
   );

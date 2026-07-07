@@ -1,47 +1,60 @@
 import { useState, useEffect } from 'react';
 import { MACRO_INIT, MACRO_META } from '../lib/data';
 import { calcComprehensiveScore } from '../lib/calculations';
-import { fmt, pct, clr, sigCol, sigIcon, sigLbl, SectionTitle, computeMacroValues, levelMatch, colOf } from './shared';
+import { fmt, pct, clr, sigCol, sigIcon, sigLbl, SectionTitle, CardGrid, computeMacroValues, levelMatch, colOf } from './shared';
 import { buildStocks } from './stockUtils';
 
 const gradeCol = g => g?.startsWith('A') ? 'var(--green)' : g?.startsWith('B') ? 'var(--gold)' : 'var(--red)';
 
-// ── 스켈레톤 로딩 바 ──
-function Skeleton({ rows = 5 }) {
+// ── 스켈레톤 카드 그리드 ──
+function SkeletonGrid({ n = 8 }) {
   return (
-    <div style={{padding:'8px 12px'}}>
-      {Array.from({length: rows}).map((_,i)=>(
-        <div key={i} style={{height:14,background:'var(--bg3)',borderRadius:6,marginBottom:10,opacity:1-(i*0.15),animation:'pulse 1.5s infinite'}}/>
+    <CardGrid min={230}>
+      {Array.from({length:n}).map((_,i)=>(
+        <div key={i} style={{height:76,background:'var(--bg2)',border:'1px solid var(--line)',borderRadius:12,animation:'pulse 1.5s infinite',animationDelay:`${i*0.1}s`}}/>
       ))}
+    </CardGrid>
+  );
+}
+
+// ── 랭킹 카드 (한 줄 4개 그리드용) ──
+function RankCard({ s, rank, right, onClick, highlight }) {
+  return (
+    <div onClick={onClick} style={{
+      background:'var(--bg2)', border: highlight ? '2px solid var(--gold)' : '1px solid var(--line)',
+      borderRadius:12, padding:'10px 12px', cursor:'pointer', display:'flex', flexDirection:'column', gap:5,
+    }}>
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+        <div style={{display:'flex',gap:6,alignItems:'center',minWidth:0}}>
+          <span className="mono" style={{fontSize:9,color:'var(--dim)',flexShrink:0}}>#{rank}</span>
+          <span className="mono" style={{fontWeight:700,fontSize:13,color:'var(--strong)'}}>{s.symbol}</span>
+          {s.lite===false&&<span style={{fontSize:7,color:'var(--gold)',border:'1px solid var(--gold-bd)',borderRadius:2,padding:'0 3px',flexShrink:0}}>정밀</span>}
+        </div>
+        {right}
+      </div>
+      <div style={{fontSize:9,color:'var(--dim)',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{s.name} · {s.sector||''}</div>
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+        <span className="mono" style={{fontSize:13,fontWeight:700,color:'var(--text)'}}>${fmt(s.price)}</span>
+        {s.change!=null&&<span className={`mono ${clr(s.change)}`} style={{fontSize:10}}>{s.change>0?'▲':'▼'}{Math.abs(s.change).toFixed(2)}%</span>}
+      </div>
     </div>
   );
 }
 
-// ── TOP30 랭킹 리스트 (기본 10개 + 더보기) ──
-function RankList({ items, renderRight, emptyText, openStock, borderCol }) {
+// ── TOP30 그리드 (기본 8개 + 더보기 30개) ──
+function RankGrid({ items, renderRight, emptyText, openStock, err }) {
   const [expand, setExpand] = useState(false);
-  if (!items) return <Skeleton/>;
-  if (items.length === 0) return <div style={{padding:'14px',fontSize:11,color:'var(--dim)',textAlign:'center'}}>{emptyText||'스크리닝 대기 중'}</div>;
-  const visible = expand ? items : items.slice(0, 10);
+  if (err) return <div style={{margin:'0 12px',padding:'12px',background:'var(--red-bg)',border:'1px solid var(--red-bd)',borderRadius:10,fontSize:11,color:'var(--red)'}}>⚠️ 스크리닝 실패: {err}</div>;
+  if (!items) return <SkeletonGrid/>;
+  if (items.length===0) return <div style={{margin:'0 12px',padding:'14px',background:'var(--bg2)',border:'1px solid var(--line)',borderRadius:10,fontSize:11,color:'var(--dim)',textAlign:'center'}}>{emptyText||'스크리닝 대기 중'}</div>;
+  const visible = expand ? items : items.slice(0,8);
   return (
     <>
-      {visible.map((s, i) => (
-        <div key={s.symbol} onClick={()=>openStock(s.symbol)}
-          style={{display:'flex',alignItems:'center',gap:8,padding:'7px 12px',borderBottom:i<visible.length-1?'1px solid var(--line)':'none',cursor:'pointer'}}>
-          <span className="mono" style={{fontSize:10,color:'var(--dim)',width:18,textAlign:'right',flexShrink:0}}>{i+1}</span>
-          <div style={{flex:1,minWidth:0}}>
-            <div style={{display:'flex',gap:6,alignItems:'center'}}>
-              <span className="mono" style={{fontWeight:700,fontSize:12,color:'var(--strong)'}}>{s.symbol}</span>
-              {s.lite===false&&<span style={{fontSize:7,color:'var(--gold)',border:'1px solid var(--gold-bd)',borderRadius:2,padding:'0 3px'}}>정밀</span>}
-            </div>
-            <div style={{fontSize:9,color:'var(--dim)',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{s.name} · {s.sector||''}</div>
-          </div>
-          <div className="mono" style={{fontSize:11,fontWeight:600,color:'var(--text)',flexShrink:0}}>${fmt(s.price)}</div>
-          {renderRight(s)}
-        </div>
-      ))}
-      {!expand && items.length > 10 && (
-        <div onClick={e=>{e.stopPropagation();setExpand(true);}} style={{padding:'9px',textAlign:'center',fontSize:11,color:'var(--gold)',cursor:'pointer',borderTop:'1px solid var(--line)'}}>
+      <CardGrid min={230}>
+        {visible.map((s,i)=><RankCard key={s.symbol} s={s} rank={i+1} right={renderRight(s)} onClick={()=>openStock(s.symbol)}/>)}
+      </CardGrid>
+      {!expand&&items.length>8&&(
+        <div onClick={()=>setExpand(true)} style={{margin:'6px 12px 0',padding:'8px',textAlign:'center',fontSize:11,color:'var(--gold)',cursor:'pointer',background:'var(--bg2)',borderRadius:10,border:'1px solid var(--line)'}}>
           TOP {items.length}까지 더보기 ▼
         </div>
       )}
@@ -55,7 +68,6 @@ export default function HomePage({ prices, loading, macro, openStock, openMacro,
   const values = computeMacroValues(m);
   const stocks = buildStocks(prices, treasury);
 
-  // ── 스크리닝 데이터 로드 ──
   const [screen, setScreen] = useState(null);
   const [screenErr, setScreenErr] = useState(null);
   useEffect(() => {
@@ -73,15 +85,15 @@ export default function HomePage({ prices, loading, macro, openStock, openMacro,
   const macroDots = macroKeys.map(k => {
     const meta = MACRO_META[k];
     const lvl = meta ? levelMatch(meta.levels, values[k]) : null;
-    return { key:k, short: meta?.short||k, col: lvl?colOf(lvl.color):'var(--dim)', icon: meta?.icon };
+    return { key:k, short: meta?.short||k, col: lvl?colOf(lvl.color):'var(--dim)' };
   });
   const redCnt = macroDots.filter(d=>d.col==='var(--red)').length;
 
-  // ② 보유·트래킹 3대 점수
+  // ② 내 종목 3대 점수
   const myStocks = stocks.filter(s=>s.type==='portfolio'||s.type==='watch'||s.type==='locked')
     .map(s => ({ ...s, comprehensive: calcComprehensiveScore(s, prices[s.sym]) }));
 
-  // ⑥ 교집합 (2개 이상 리스트 동시 등장)
+  // ⑥ 교집합
   let intersection = [];
   if (screen?.top30Comprehensive) {
     const inC = new Set(screen.top30Comprehensive.map(s=>s.symbol));
@@ -109,13 +121,13 @@ export default function HomePage({ prices, loading, macro, openStock, openMacro,
 
   return (
     <div style={{paddingBottom:80}}>
-      <style>{`@keyframes pulse{0%,100%{opacity:.5}50%{opacity:1}}`}</style>
+      <style>{`@keyframes pulse{0%,100%{opacity:.45}50%{opacity:1}}`}</style>
 
       {/* ① 매크로 신호등 압축 */}
       <div onClick={()=>goTab('macroguru')} style={{margin:'8px 12px',padding:'10px 14px',background:'var(--bg2)',borderRadius:12,border:'1px solid var(--line2)',cursor:'pointer',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
         <div>
-          <div style={{fontSize:9,color:'var(--dim)',marginBottom:4}}>매크로 · {m.regime} {redCnt>=4?'🔴':redCnt>=2?'🟡':'🟢'}</div>
-          <div style={{display:'flex',gap:7}}>
+          <div style={{fontSize:9,color:'var(--dim)',marginBottom:4}}>매크로 · {m.regime} {redCnt>=4?'🔴':redCnt>=2?'🟡':'🟢'} · 주식 {m.stock_cash_ratio}% 권고</div>
+          <div style={{display:'flex',gap:9}}>
             {macroDots.map(d=>(
               <div key={d.key} onClick={e=>{e.stopPropagation();openMacro(d.key);}} style={{display:'flex',flexDirection:'column',alignItems:'center',gap:2}}>
                 <div style={{width:10,height:10,borderRadius:'50%',background:d.col}}/>
@@ -127,88 +139,65 @@ export default function HomePage({ prices, loading, macro, openStock, openMacro,
         <span style={{fontSize:10,color:'var(--gold)'}}>상세 →</span>
       </div>
 
-      {/* ② 내 종목 3대 점수 테이블 */}
+      {/* ② 내 종목 3대 점수 — 4열 그리드 */}
       <SectionTitle>💼 내 보유·트래킹 — 3대 점수</SectionTitle>
-      <div style={{margin:'0 12px 6px',background:'var(--bg2)',borderRadius:14,border:'1px solid var(--line)',overflow:'hidden'}}>
-        <div style={{display:'flex',padding:'6px 12px',borderBottom:'1px solid var(--line2)',fontSize:8,color:'var(--dim)',textTransform:'uppercase',letterSpacing:'.05em'}}>
-          <span style={{width:52}}>종목</span>
-          <span style={{flex:1,textAlign:'right'}}>현재가</span>
-          <span style={{width:52,textAlign:'right'}}>등락</span>
-          <span style={{width:56,textAlign:'center'}}>종합</span>
-          <span style={{width:44,textAlign:'center'}}>전략</span>
-          <span style={{width:36,textAlign:'right'}}>텐베거</span>
-        </div>
-        {myStocks.map((s,i)=>(
-          <div key={s.sym} onClick={()=>openStock(s.sym)} style={{display:'flex',alignItems:'center',padding:'8px 12px',borderBottom:i<myStocks.length-1?'1px solid var(--line)':'none',cursor:'pointer'}}>
-            <span className="mono" style={{width:52,fontWeight:700,fontSize:12,color:'var(--strong)'}}>{s.sym}</span>
-            <span className="mono" style={{flex:1,textAlign:'right',fontSize:11,color:'var(--text)'}}>{s.cur?`$${fmt(s.cur)}`:loading?'⋯':'—'}</span>
-            <span className={`mono ${clr(s.chg)}`} style={{width:52,textAlign:'right',fontSize:10}}>{s.chg!=null?`${s.chg>0?'+':''}${s.chg.toFixed(2)}%`:'—'}</span>
-            <span style={{width:56,textAlign:'center'}}>
-              <span className="mono" style={{fontSize:11,fontWeight:700,color:gradeCol(s.comprehensive.grade)}}>{s.comprehensive.score}</span>
-              <span style={{fontSize:8,color:gradeCol(s.comprehensive.grade),marginLeft:2}}>{s.comprehensive.grade}</span>
-            </span>
-            <span style={{width:44,textAlign:'center',fontSize:9,fontWeight:700,color:sigCol(s.comp.signal)}}>{s.type==='locked'?'🔒':`${sigIcon(s.comp.signal)}`}</span>
-            <span className="mono" style={{width:36,textAlign:'right',fontSize:11,fontWeight:700,color:s.ten>=70?'var(--green)':s.ten>=50?'var(--gold)':'var(--dim2)'}}>{s.ten}</span>
+      <CardGrid min={230}>
+        {myStocks.map(s=>(
+          <div key={s.sym} onClick={()=>openStock(s.sym)} style={{background:'var(--bg2)',border:'1px solid var(--line)',borderLeft:`3px solid ${s.type==='locked'?'var(--dim)':sigCol(s.comp.signal)}`,borderRadius:12,padding:'10px 12px',cursor:'pointer'}}>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:4}}>
+              <span className="mono" style={{fontWeight:700,fontSize:13,color:'var(--strong)'}}>{s.sym}</span>
+              <div style={{textAlign:'right'}}>
+                <span className="mono" style={{fontSize:12,fontWeight:700,color:'var(--text)'}}>{s.cur?`$${fmt(s.cur)}`:loading?'⋯':'—'}</span>
+                {s.chg!=null&&<span className={`mono ${clr(s.chg)}`} style={{fontSize:9,marginLeft:5}}>{s.chg>0?'+':''}{s.chg.toFixed(2)}%</span>}
+              </div>
+            </div>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',fontSize:10}}>
+              <span>종합 <b className="mono" style={{color:gradeCol(s.comprehensive.grade)}}>{s.comprehensive.score}{s.comprehensive.grade}</b></span>
+              <span style={{color:sigCol(s.comp.signal),fontWeight:700}}>{s.type==='locked'?'🔒장기':`${sigIcon(s.comp.signal)}${sigLbl(s.comp.signal)}`}</span>
+              <span>텐베거 <b className="mono" style={{color:s.ten>=70?'var(--green)':s.ten>=50?'var(--gold)':'var(--dim2)'}}>{s.ten}</b></span>
+            </div>
           </div>
         ))}
-      </div>
+      </CardGrid>
 
       {/* ③ 종합점수 TOP30 */}
-      <SectionTitle>🏆 종합점수 TOP30 — 유니버스 {screen?.universe_size||'약 190'}종목 스크리닝</SectionTitle>
-      <div style={{margin:'0 12px 6px',background:'var(--bg2)',borderRadius:14,border:'1px solid var(--line)',overflow:'hidden'}}>
-        {screenErr && <div style={{padding:'12px',fontSize:11,color:'var(--red)'}}>⚠️ 스크리닝 실패: {screenErr}</div>}
-        <RankList items={screen?.top30Comprehensive} openStock={openStock}
-          emptyText="스크리닝 대기 중 — 잠시 후 새로고침"
-          renderRight={s=>(
-            <span style={{width:52,textAlign:'right',flexShrink:0}}>
-              <span className="mono" style={{fontSize:12,fontWeight:700,color:gradeCol(s.comprehensive.grade)}}>{s.comprehensive.score}</span>
-              <span style={{fontSize:9,color:gradeCol(s.comprehensive.grade),marginLeft:2}}>{s.comprehensive.grade}</span>
-            </span>
-          )}/>
-      </div>
+      <SectionTitle>🏆 종합점수 TOP30 — 유니버스 {screen?.universe_size||163}종목 스크리닝</SectionTitle>
+      <RankGrid items={screen?.top30Comprehensive} openStock={openStock} err={screenErr}
+        emptyText="스크리닝 대기 중 — 잠시 후 새로고침"
+        renderRight={s=>(
+          <span className="mono" style={{fontSize:13,fontWeight:700,color:gradeCol(s.comprehensive.grade),flexShrink:0}}>
+            {s.comprehensive.score}<span style={{fontSize:9,marginLeft:1}}>{s.comprehensive.grade}</span>
+          </span>
+        )}/>
 
       {/* ④ MARS-V TOP30 */}
       <SectionTitle>🎯 MARS-V 전략 TOP30 — 18개 방법론 종합</SectionTitle>
-      <div style={{margin:'0 12px 6px',background:'var(--bg2)',borderRadius:14,border:'1px solid var(--line)',overflow:'hidden'}}>
-        <RankList items={screen?.top30MarsV} openStock={openStock}
-          emptyText="스크리닝 대기 중 (정밀 데이터 보유 종목만 대상)"
-          renderRight={s=>(
-            <span style={{width:52,textAlign:'right',flexShrink:0,fontSize:9,fontWeight:700,color:sigCol(s.marsV.signal)}}>
-              {sigIcon(s.marsV.signal)} {sigLbl(s.marsV.signal)}
-            </span>
-          )}/>
-      </div>
+      <RankGrid items={screen?.top30MarsV} openStock={openStock}
+        emptyText="스크리닝 대기 중 (정밀 데이터 보유 종목만 대상)"
+        renderRight={s=>(
+          <span style={{fontSize:10,fontWeight:700,color:sigCol(s.marsV.signal),flexShrink:0}}>{sigIcon(s.marsV.signal)}{sigLbl(s.marsV.signal)}</span>
+        )}/>
 
       {/* ⑤ 텐베거 TOP30 */}
       <SectionTitle>🚀 텐베거 TOP30</SectionTitle>
-      <div style={{margin:'0 12px 6px',background:'var(--bg2)',borderRadius:14,border:'1px solid var(--line)',overflow:'hidden'}}>
-        <RankList items={screen?.top30TenBagger} openStock={openStock}
-          emptyText="스크리닝 대기 중"
-          renderRight={s=>(
-            <span style={{width:52,textAlign:'right',flexShrink:0}}>
-              <span className="mono" style={{fontSize:12,fontWeight:700,color:s.tenBagger>=70?'var(--green)':s.tenBagger>=50?'var(--gold)':'var(--dim2)'}}>{s.tenBagger}</span>
-              <span style={{fontSize:8,color:'var(--dim)',marginLeft:1}}>점</span>
-            </span>
-          )}/>
-      </div>
+      <RankGrid items={screen?.top30TenBagger} openStock={openStock}
+        emptyText="스크리닝 대기 중"
+        renderRight={s=>(
+          <span className="mono" style={{fontSize:13,fontWeight:700,color:s.tenBagger>=70?'var(--green)':s.tenBagger>=50?'var(--gold)':'var(--dim2)',flexShrink:0}}>
+            {s.tenBagger}<span style={{fontSize:8,color:'var(--dim)'}}>점</span>
+          </span>
+        )}/>
 
       {/* ⑥ 교집합 하이라이트 */}
-      {intersection.length > 0 && (
+      {intersection.length>0&&(
         <>
-          <SectionTitle>⭐ 이중 검증 — 2개 이상 체계에서 동시 상위권</SectionTitle>
-          <div style={{margin:'0 12px 6px',background:'var(--bg2)',borderRadius:14,border:'2px solid var(--gold)',overflow:'hidden'}}>
+          <SectionTitle>⭐ 이중 검증 — 2개 이상 체계 동시 상위권</SectionTitle>
+          <CardGrid min={230}>
             {intersection.slice(0,8).map((s,i)=>(
-              <div key={s.symbol} onClick={()=>openStock(s.symbol)} style={{display:'flex',alignItems:'center',gap:8,padding:'9px 12px',borderBottom:i<Math.min(8,intersection.length)-1?'1px solid var(--line)':'none',cursor:'pointer'}}>
-                <span style={{fontSize:13}}>{'⭐'.repeat(s.hitCount>=3?3:2)}</span>
-                <div style={{flex:1,minWidth:0}}>
-                  <span className="mono" style={{fontWeight:700,fontSize:13,color:'var(--strong)'}}>{s.symbol}</span>
-                  <span style={{fontSize:9,color:'var(--dim)',marginLeft:6}}>{s.name}</span>
-                </div>
-                <span style={{fontSize:9,color:'var(--gold)',fontWeight:700}}>{s.hitCount}개 체계 검증</span>
-                <span className="mono" style={{fontSize:11,fontWeight:600,color:'var(--text)'}}>${fmt(s.price)}</span>
-              </div>
+              <RankCard key={s.symbol} s={s} rank={i+1} highlight onClick={()=>openStock(s.symbol)}
+                right={<span style={{fontSize:9,color:'var(--gold)',fontWeight:700,flexShrink:0}}>{'⭐'.repeat(Math.min(3,s.hitCount))} {s.hitCount}중검증</span>}/>
             ))}
-          </div>
+          </CardGrid>
         </>
       )}
 
@@ -216,12 +205,16 @@ export default function HomePage({ prices, loading, macro, openStock, openMacro,
       <SectionTitle>🚨 오늘의 경보</SectionTitle>
       {alerts.length===0
         ? <div style={{margin:'0 12px 8px',padding:'10px 14px',background:'var(--green-bg)',border:'1px solid var(--green-bd)',borderRadius:10,fontSize:11,color:'var(--dim2)'}}>✅ 현재 활성 경보 없음</div>
-        : alerts.map((a,i)=>(
-          <div key={i} style={{margin:'0 12px 4px',padding:'10px 14px',background:'var(--red-bg)',border:'1px solid var(--red-bd)',borderRadius:10}}>
-            <span className="mono" style={{fontSize:11,fontWeight:700,color:'var(--red)'}}>{a.sym}</span>
-            <span style={{fontSize:11,color:'var(--dim2)',marginLeft:8}}>{a.msg}</span>
-          </div>
-        ))
+        : (
+          <CardGrid min={280}>
+            {alerts.map((a,i)=>(
+              <div key={i} style={{padding:'10px 14px',background:'var(--red-bg)',border:'1px solid var(--red-bd)',borderRadius:10}}>
+                <span className="mono" style={{fontSize:11,fontWeight:700,color:'var(--red)'}}>{a.sym}</span>
+                <span style={{fontSize:11,color:'var(--dim2)',marginLeft:8}}>{a.msg}</span>
+              </div>
+            ))}
+          </CardGrid>
+        )
       }
       <div style={{height:10}}/>
     </div>
