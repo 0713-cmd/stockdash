@@ -1,5 +1,5 @@
 import { MACRO_META } from '../lib/data';
-import { levelMatch, colOf } from './shared';
+import { levelMatch, colOf, BackBtn } from './shared';
 
 // 컴팩트 정사각 매크로 카드 — 그리드에 여러 개 배치
 export function MacroCard({ mkey, value, onClick }) {
@@ -38,7 +38,7 @@ export function MacroDetail({ mkey, value, onBack }) {
   return (
     <div style={{paddingBottom:80}}>
       <div style={{padding:'12px 16px 4px'}}>
-        <div style={{fontSize:11,color:'var(--dim)',cursor:'pointer',marginBottom:8}} onClick={onBack}>← 뒤로</div>
+        <BackBtn onClick={onBack}/>
         <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:4}}>
           <span style={{fontSize:22}}>{meta.icon}</span>
           <span style={{fontSize:18,fontWeight:700,color:'var(--strong)'}}>{meta.label}</span>

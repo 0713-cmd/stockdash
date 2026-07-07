@@ -5,8 +5,10 @@ import {
   calcPEPercentile, calcPositionSize, genFinancialHistory,
 } from '../lib/calculations';
 import {
-  fmt, fmtK, pct, clr, sigBg, sigBd, SigBadge, MiniBar, SectionTitle, Row, MetricRow,
+  fmt, fmtK, pct, clr, sigBg, sigBd, SigBadge, MiniBar, SectionTitle, Row, MetricRow, BackBtn,
 } from './shared';
+import { ScoreBreakdown } from './ScoreBits';
+import { calcComprehensiveScore } from '../lib/calculations';
 import { guruHoldersOf, macroSensitivity } from './stockUtils';
 
 // Claude 정밀분석 프롬프트 복사 버튼
@@ -123,29 +125,35 @@ export default function StockDetail({ sym, prices, macro, macroValues, onBack })
   const hist = genFinancialHistory(s);
   const holders = guruHoldersOf(sym);
   const sens = macroValues ? macroSensitivity(s, macroValues) : [];
+  const comprehensive = calcComprehensiveScore(s, p);
 
   return (
     <div style={{paddingBottom:80}}>
-      <div style={{padding:'12px 16px 4px',display:'flex',justifyContent:'space-between',alignItems:'flex-start'}}>
-        <div>
-          <div style={{fontSize:11,color:'var(--dim)',cursor:'pointer',marginBottom:4}} onClick={onBack}>← 뒤로</div>
-          <div style={{display:'flex',gap:8,alignItems:'center'}}>
-            <span className="mono" style={{fontSize:22,fontWeight:700,color:'var(--strong)'}}>{sym}</span>
-            <SigBadge s={comp.signal}/>
+      <div style={{padding:'12px 16px 4px'}}>
+        <BackBtn onClick={onBack}/>
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start'}}>
+          <div>
+            <div style={{display:'flex',gap:8,alignItems:'center'}}>
+              <span className="mono" style={{fontSize:22,fontWeight:700,color:'var(--strong)'}}>{sym}</span>
+              <SigBadge s={comp.signal}/>
+            </div>
+            <div style={{fontSize:11,color:'var(--dim2)',marginTop:1}}>{p?.name || s.name} · {p?.sector || s.sector}{s.lite && ' · 유니버스 종목(가격 지표만)'}</div>
           </div>
-          <div style={{fontSize:11,color:'var(--dim2)',marginTop:1}}>{p?.name || s.name} · {p?.sector || s.sector}{s.lite && ' · 유니버스 종목(가격 지표만)'}</div>
-        </div>
-        <div style={{textAlign:'right'}}>
-          <div className="mono" style={{fontSize:24,fontWeight:700,color:'var(--strong)'}}>{cur?`$${fmt(cur)}`:'—'}</div>
-          {p?.change!=null&&<div className={`mono ${clr(p.change)}`} style={{fontSize:11,marginTop:1}}>{p.change>0?'▲':'▼'}{Math.abs(p.change).toFixed(2)}%</div>}
+          <div style={{textAlign:'right'}}>
+            <div className="mono" style={{fontSize:24,fontWeight:700,color:'var(--strong)'}}>{cur?`$${fmt(cur)}`:'—'}</div>
+            {p?.change!=null&&<div className={`mono ${clr(p.change)}`} style={{fontSize:11,marginTop:1}}>{p.change>0?'▲':'▼'}{Math.abs(p.change).toFixed(2)}%</div>}
+          </div>
         </div>
       </div>
+
+      {/* ★ 종합점수 브레이크다운 — 지표별 현재값·기준·획득점수 전부 공개 */}
+      <ScoreBreakdown comp={comprehensive}/>
 
       {/* 신호 + 매수이유 요약 */}
       <div style={{margin:'6px 12px',padding:'12px 14px',background:sigBg(comp.signal),border:`1px solid ${sigBd(comp.signal)}`,borderRadius:14}}>
         <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:6}}>
           <SigBadge s={comp.signal}/>
-          <span style={{fontSize:10,color:'var(--dim)'}}>종합점수 {comp.score}</span>
+          <span style={{fontSize:10,color:'var(--dim)'}}>MARS-V 전략점수 {comp.score}</span>
         </div>
         {s.type!=='locked'&&cur&&(
           <div style={{fontSize:12,color:'var(--text)',lineHeight:1.8}}>

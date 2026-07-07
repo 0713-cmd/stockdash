@@ -168,6 +168,20 @@ export function MiniBar({ pct: p, col }) {
   return <div style={{height:3,background:'var(--bg4)',borderRadius:2}}><div style={{height:'100%',width:`${Math.max(0,Math.min(100,p))}%`,background:col||'var(--gold)',borderRadius:2}}/></div>;
 }
 
+// 큰 뒤로가기 버튼
+export function BackBtn({ onClick }) {
+  return (
+    <button onClick={onClick} style={{
+      display:'inline-flex', alignItems:'center', gap:6,
+      background:'var(--bg3)', border:'1px solid var(--line2)', borderRadius:10,
+      color:'var(--text)', fontSize:14, fontWeight:700, padding:'9px 18px',
+      cursor:'pointer', fontFamily:'inherit', marginBottom:10,
+    }}>
+      ← 뒤로
+    </button>
+  );
+}
+
 // 반응형 카드 그리드 — 데스크톱 4열, 태블릿 2~3열, 모바일 1~2열
 export function CardGrid({ children, min = 230, gap = 8 }) {
   return (

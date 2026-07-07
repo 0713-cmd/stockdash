@@ -1,64 +1,52 @@
 import { useState, useEffect } from 'react';
 import { MACRO_INIT, MACRO_META } from '../lib/data';
 import { calcComprehensiveScore } from '../lib/calculations';
-import { fmt, pct, clr, sigCol, sigIcon, sigLbl, SectionTitle, CardGrid, computeMacroValues, levelMatch, colOf } from './shared';
+import { fmt, clr, sigCol, sigIcon, sigLbl, SectionTitle, CardGrid, computeMacroValues, levelMatch, colOf } from './shared';
+import { ScoreExplainer, gradeCol } from './ScoreBits';
 import { buildStocks } from './stockUtils';
 
-const gradeCol = g => g?.startsWith('A') ? 'var(--green)' : g?.startsWith('B') ? 'var(--gold)' : 'var(--red)';
-
-// ── 스켈레톤 카드 그리드 ──
-function SkeletonGrid({ n = 8 }) {
+// ── 컬럼 안의 종목 한 줄 ──
+function ColRow({ sym, name, price, change, right, onClick, last, highlight }) {
   return (
-    <CardGrid min={230}>
-      {Array.from({length:n}).map((_,i)=>(
-        <div key={i} style={{height:76,background:'var(--bg2)',border:'1px solid var(--line)',borderRadius:12,animation:'pulse 1.5s infinite',animationDelay:`${i*0.1}s`}}/>
-      ))}
-    </CardGrid>
-  );
-}
-
-// ── 랭킹 카드 (한 줄 4개 그리드용) ──
-function RankCard({ s, rank, right, onClick, highlight }) {
-  return (
-    <div onClick={onClick} style={{
-      background:'var(--bg2)', border: highlight ? '2px solid var(--gold)' : '1px solid var(--line)',
-      borderRadius:12, padding:'10px 12px', cursor:'pointer', display:'flex', flexDirection:'column', gap:5,
-    }}>
-      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
-        <div style={{display:'flex',gap:6,alignItems:'center',minWidth:0}}>
-          <span className="mono" style={{fontSize:9,color:'var(--dim)',flexShrink:0}}>#{rank}</span>
-          <span className="mono" style={{fontWeight:700,fontSize:13,color:'var(--strong)'}}>{s.symbol}</span>
-          {s.lite===false&&<span style={{fontSize:7,color:'var(--gold)',border:'1px solid var(--gold-bd)',borderRadius:2,padding:'0 3px',flexShrink:0}}>정밀</span>}
+    <div onClick={onClick} style={{display:'flex',alignItems:'center',gap:7,padding:'8px 10px',borderBottom:last?'none':'1px solid var(--line)',cursor:'pointer',background:highlight?'var(--gold-bg)':'transparent'}}>
+      <div style={{flex:1,minWidth:0}}>
+        <div style={{display:'flex',gap:5,alignItems:'baseline'}}>
+          <span className="mono" style={{fontWeight:700,fontSize:12,color:'var(--strong)'}}>{sym}</span>
+          {change!=null&&<span className={`mono ${clr(change)}`} style={{fontSize:9}}>{change>0?'+':''}{change.toFixed(2)}%</span>}
         </div>
-        {right}
+        <div style={{fontSize:9,color:'var(--dim)',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{name||''}</div>
       </div>
-      <div style={{fontSize:9,color:'var(--dim)',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{s.name} · {s.sector||''}</div>
-      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
-        <span className="mono" style={{fontSize:13,fontWeight:700,color:'var(--text)'}}>${fmt(s.price)}</span>
-        {s.change!=null&&<span className={`mono ${clr(s.change)}`} style={{fontSize:10}}>{s.change>0?'▲':'▼'}{Math.abs(s.change).toFixed(2)}%</span>}
-      </div>
+      <span className="mono" style={{fontSize:11,fontWeight:600,color:'var(--text)',flexShrink:0}}>{price!=null?`$${fmt(price)}`:'—'}</span>
+      <span style={{minWidth:44,textAlign:'right',flexShrink:0}}>{right}</span>
     </div>
   );
 }
 
-// ── TOP30 그리드 (기본 8개 + 더보기 30개) ──
-function RankGrid({ items, renderRight, emptyText, openStock, err }) {
+// ── 세로 컬럼 (헤더 + 리스트 + 더보기) ──
+function Column({ icon, title, sub, items, renderRow, emptyText, borderCol }) {
   const [expand, setExpand] = useState(false);
-  if (err) return <div style={{margin:'0 12px',padding:'12px',background:'var(--red-bg)',border:'1px solid var(--red-bd)',borderRadius:10,fontSize:11,color:'var(--red)'}}>⚠️ 스크리닝 실패: {err}</div>;
-  if (!items) return <SkeletonGrid/>;
-  if (items.length===0) return <div style={{margin:'0 12px',padding:'14px',background:'var(--bg2)',border:'1px solid var(--line)',borderRadius:10,fontSize:11,color:'var(--dim)',textAlign:'center'}}>{emptyText||'스크리닝 대기 중'}</div>;
-  const visible = expand ? items : items.slice(0,8);
+  const visible = items ? (expand ? items : items.slice(0, 15)) : null;
   return (
-    <>
-      <CardGrid min={230}>
-        {visible.map((s,i)=><RankCard key={s.symbol} s={s} rank={i+1} right={renderRight(s)} onClick={()=>openStock(s.symbol)}/>)}
-      </CardGrid>
-      {!expand&&items.length>8&&(
-        <div onClick={()=>setExpand(true)} style={{margin:'6px 12px 0',padding:'8px',textAlign:'center',fontSize:11,color:'var(--gold)',cursor:'pointer',background:'var(--bg2)',borderRadius:10,border:'1px solid var(--line)'}}>
-          TOP {items.length}까지 더보기 ▼
+    <div style={{background:'var(--bg2)',border:`1px solid ${borderCol||'var(--line)'}`,borderRadius:14,overflow:'hidden',display:'flex',flexDirection:'column',alignSelf:'start'}}>
+      <div style={{padding:'10px 12px',borderBottom:'1px solid var(--line2)',background:'var(--bg3)'}}>
+        <div style={{fontSize:12,fontWeight:700,color:'var(--strong)'}}>{icon} {title}</div>
+        {sub&&<div style={{fontSize:9,color:'var(--dim)',marginTop:2}}>{sub}</div>}
+      </div>
+      {!visible&&(
+        <div style={{padding:'10px'}}>
+          {Array.from({length:8}).map((_,i)=>(
+            <div key={i} style={{height:12,background:'var(--bg3)',borderRadius:6,marginBottom:10,animation:'pulse 1.5s infinite',animationDelay:`${i*0.1}s`}}/>
+          ))}
         </div>
       )}
-    </>
+      {visible&&visible.length===0&&<div style={{padding:'14px',fontSize:11,color:'var(--dim)',textAlign:'center'}}>{emptyText||'스크리닝 대기 중'}</div>}
+      {visible&&visible.map((it,i)=>renderRow(it,i,i===visible.length-1&&!(items.length>15&&!expand)))}
+      {visible&&items.length>15&&!expand&&(
+        <div onClick={()=>setExpand(true)} style={{padding:'8px',textAlign:'center',fontSize:10,color:'var(--gold)',cursor:'pointer',borderTop:'1px solid var(--line)'}}>
+          {items.length}개 전체 ▼
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -80,7 +68,7 @@ export default function HomePage({ prices, loading, macro, openStock, openMacro,
     return ()=>{ alive = false; };
   }, []);
 
-  // ① 매크로 신호등 한 줄
+  // 매크로 신호등 한 줄
   const macroKeys = ['fed_rate','shiller_cape','buffett_indicator','ism_pmi','cpi_yoy','dxy','fed_model'];
   const macroDots = macroKeys.map(k => {
     const meta = MACRO_META[k];
@@ -89,41 +77,35 @@ export default function HomePage({ prices, loading, macro, openStock, openMacro,
   });
   const redCnt = macroDots.filter(d=>d.col==='var(--red)').length;
 
-  // ② 내 종목 3대 점수
+  // 내 종목 (종합점수 순 정렬)
   const myStocks = stocks.filter(s=>s.type==='portfolio'||s.type==='watch'||s.type==='locked')
-    .map(s => ({ ...s, comprehensive: calcComprehensiveScore(s, prices[s.sym]) }));
+    .map(s => ({ ...s, comprehensive: calcComprehensiveScore(s, prices[s.sym]) }))
+    .sort((a,b)=>b.comprehensive.score-a.comprehensive.score);
 
-  // ⑥ 교집합
-  let intersection = [];
+  // 교집합 심볼 (금색 하이라이트용)
+  const interSet = new Set();
   if (screen?.top30Comprehensive) {
     const inC = new Set(screen.top30Comprehensive.map(s=>s.symbol));
     const inM = new Set((screen.top30MarsV||[]).map(s=>s.symbol));
     const inT = new Set((screen.top30TenBagger||[]).map(s=>s.symbol));
-    const counts = {};
-    [...inC,...inM,...inT].forEach(sym=>{ counts[sym]=(inC.has(sym)?1:0)+(inM.has(sym)?1:0)+(inT.has(sym)?1:0); });
-    intersection = Object.entries(counts)
-      .filter(([,c])=>c>=2)
-      .map(([sym,c])=>{
-        const src = screen.top30Comprehensive.find(s=>s.symbol===sym)
-          || screen.top30MarsV?.find(s=>s.symbol===sym)
-          || screen.top30TenBagger?.find(s=>s.symbol===sym);
-        return { ...src, hitCount: c };
-      })
-      .sort((a,b)=>b.hitCount-a.hitCount || b.comprehensive.score-a.comprehensive.score);
+    [...inC,...inM,...inT].forEach(sym=>{
+      const c = (inC.has(sym)?1:0)+(inM.has(sym)?1:0)+(inT.has(sym)?1:0);
+      if (c>=2) interSet.add(sym);
+    });
   }
 
-  // ⑦ 경보
+  // 경보
   const alerts = [];
   stocks.forEach(s=>{
     if (s.beneish_m != null && s.beneish_m > -1.78) alerts.push({sym:s.sym, msg:`Beneish M ${s.beneish_m} — 실적 조작 의심 구간`});
-    if (s.cur && s.fair_value && s.cur > s.fair_value*1.25 && s.type==='portfolio') alerts.push({sym:s.sym, msg:'적정가 +25% 초과 — 익절 검토 구간'});
+    if (s.cur && s.fair_value && s.cur > s.fair_value*1.25 && s.type==='portfolio') alerts.push({sym:s.sym, msg:'적정가 +25% 초과 — 익절 검토'});
   });
 
   return (
     <div style={{paddingBottom:80}}>
       <style>{`@keyframes pulse{0%,100%{opacity:.45}50%{opacity:1}}`}</style>
 
-      {/* ① 매크로 신호등 압축 */}
+      {/* 매크로 신호등 */}
       <div onClick={()=>goTab('macroguru')} style={{margin:'8px 12px',padding:'10px 14px',background:'var(--bg2)',borderRadius:12,border:'1px solid var(--line2)',cursor:'pointer',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
         <div>
           <div style={{fontSize:9,color:'var(--dim)',marginBottom:4}}>매크로 · {m.regime} {redCnt>=4?'🔴':redCnt>=2?'🟡':'🟢'} · 주식 {m.stock_cash_ratio}% 권고</div>
@@ -139,69 +121,61 @@ export default function HomePage({ prices, loading, macro, openStock, openMacro,
         <span style={{fontSize:10,color:'var(--gold)'}}>상세 →</span>
       </div>
 
-      {/* ② 내 종목 3대 점수 — 4열 그리드 */}
-      <SectionTitle>💼 내 보유·트래킹 — 3대 점수</SectionTitle>
-      <CardGrid min={230}>
-        {myStocks.map(s=>(
-          <div key={s.sym} onClick={()=>openStock(s.sym)} style={{background:'var(--bg2)',border:'1px solid var(--line)',borderLeft:`3px solid ${s.type==='locked'?'var(--dim)':sigCol(s.comp.signal)}`,borderRadius:12,padding:'10px 12px',cursor:'pointer'}}>
-            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:4}}>
-              <span className="mono" style={{fontWeight:700,fontSize:13,color:'var(--strong)'}}>{s.sym}</span>
-              <div style={{textAlign:'right'}}>
-                <span className="mono" style={{fontSize:12,fontWeight:700,color:'var(--text)'}}>{s.cur?`$${fmt(s.cur)}`:loading?'⋯':'—'}</span>
-                {s.chg!=null&&<span className={`mono ${clr(s.chg)}`} style={{fontSize:9,marginLeft:5}}>{s.chg>0?'+':''}{s.chg.toFixed(2)}%</span>}
-              </div>
-            </div>
-            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',fontSize:10}}>
-              <span>종합 <b className="mono" style={{color:gradeCol(s.comprehensive.grade)}}>{s.comprehensive.score}{s.comprehensive.grade}</b></span>
-              <span style={{color:sigCol(s.comp.signal),fontWeight:700}}>{s.type==='locked'?'🔒장기':`${sigIcon(s.comp.signal)}${sigLbl(s.comp.signal)}`}</span>
-              <span>텐베거 <b className="mono" style={{color:s.ten>=70?'var(--green)':s.ten>=50?'var(--gold)':'var(--dim2)'}}>{s.ten}</b></span>
-            </div>
-          </div>
-        ))}
-      </CardGrid>
+      {/* 점수 산정 방식 설명 */}
+      <ScoreExplainer/>
+      {screenErr&&<div style={{margin:'0 12px 8px',padding:'10px 14px',background:'var(--red-bg)',border:'1px solid var(--red-bd)',borderRadius:10,fontSize:11,color:'var(--red)'}}>⚠️ 스크리닝 실패: {screenErr}</div>}
 
-      {/* ③ 종합점수 TOP30 */}
-      <SectionTitle>🏆 종합점수 TOP30 — 유니버스 {screen?.universe_size||163}종목 스크리닝</SectionTitle>
-      <RankGrid items={screen?.top30Comprehensive} openStock={openStock} err={screenErr}
-        emptyText="스크리닝 대기 중 — 잠시 후 새로고침"
-        renderRight={s=>(
-          <span className="mono" style={{fontSize:13,fontWeight:700,color:gradeCol(s.comprehensive.grade),flexShrink:0}}>
-            {s.comprehensive.score}<span style={{fontSize:9,marginLeft:1}}>{s.comprehensive.grade}</span>
-          </span>
-        )}/>
+      {/* ★ 4개 세로 컬럼: 내 종목 | 종합점수 | MARS-V | 텐베거 */}
+      <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(255px,1fr))',gap:10,margin:'0 12px'}}>
 
-      {/* ④ MARS-V TOP30 */}
-      <SectionTitle>🎯 MARS-V 전략 TOP30 — 18개 방법론 종합</SectionTitle>
-      <RankGrid items={screen?.top30MarsV} openStock={openStock}
-        emptyText="스크리닝 대기 중 (정밀 데이터 보유 종목만 대상)"
-        renderRight={s=>(
-          <span style={{fontSize:10,fontWeight:700,color:sigCol(s.marsV.signal),flexShrink:0}}>{sigIcon(s.marsV.signal)}{sigLbl(s.marsV.signal)}</span>
-        )}/>
+        {/* 컬럼 1: 내 보유·트래킹 */}
+        <Column icon="💼" title="내 보유·트래킹" sub="종합점수 순 · 클릭하면 상세" borderCol="var(--line2)"
+          items={myStocks}
+          renderRow={(s,i,last)=>(
+            <ColRow key={s.sym} sym={s.sym} name={s.name} price={s.cur} change={s.chg} last={last}
+              onClick={()=>openStock(s.sym)}
+              right={<span className="mono" style={{fontSize:12,fontWeight:700,color:gradeCol(s.comprehensive.grade)}}>{s.comprehensive.score}<span style={{fontSize:8,marginLeft:1}}>{s.comprehensive.grade}</span></span>}/>
+          )}/>
 
-      {/* ⑤ 텐베거 TOP30 */}
-      <SectionTitle>🚀 텐베거 TOP30</SectionTitle>
-      <RankGrid items={screen?.top30TenBagger} openStock={openStock}
-        emptyText="스크리닝 대기 중"
-        renderRight={s=>(
-          <span className="mono" style={{fontSize:13,fontWeight:700,color:s.tenBagger>=70?'var(--green)':s.tenBagger>=50?'var(--gold)':'var(--dim2)',flexShrink:0}}>
-            {s.tenBagger}<span style={{fontSize:8,color:'var(--dim)'}}>점</span>
-          </span>
-        )}/>
+        {/* 컬럼 2: 종합점수 TOP30 */}
+        <Column icon="🏆" title="종합점수 TOP30" sub={`유니버스 ${screen?.universe_size||163}종목 · 5개 영역 100점`} borderCol="var(--gold-bd)"
+          items={screen?.top30Comprehensive}
+          renderRow={(s,i,last)=>(
+            <ColRow key={s.symbol} sym={`${i+1}. ${s.symbol}`} name={s.name} price={s.price} change={s.change} last={last}
+              highlight={interSet.has(s.symbol)}
+              onClick={()=>openStock(s.symbol)}
+              right={<span className="mono" style={{fontSize:12,fontWeight:700,color:gradeCol(s.comprehensive.grade)}}>{s.comprehensive.score}<span style={{fontSize:8,marginLeft:1}}>{s.comprehensive.grade}</span></span>}/>
+          )}/>
 
-      {/* ⑥ 교집합 하이라이트 */}
-      {intersection.length>0&&(
-        <>
-          <SectionTitle>⭐ 이중 검증 — 2개 이상 체계 동시 상위권</SectionTitle>
-          <CardGrid min={230}>
-            {intersection.slice(0,8).map((s,i)=>(
-              <RankCard key={s.symbol} s={s} rank={i+1} highlight onClick={()=>openStock(s.symbol)}
-                right={<span style={{fontSize:9,color:'var(--gold)',fontWeight:700,flexShrink:0}}>{'⭐'.repeat(Math.min(3,s.hitCount))} {s.hitCount}중검증</span>}/>
-            ))}
-          </CardGrid>
-        </>
+        {/* 컬럼 3: MARS-V TOP30 */}
+        <Column icon="🎯" title="MARS-V 전략 TOP30" sub="18개 방법론 가중합 · 정밀 데이터 종목" borderCol="var(--blue-bd)"
+          items={screen?.top30MarsV}
+          renderRow={(s,i,last)=>(
+            <ColRow key={s.symbol} sym={`${i+1}. ${s.symbol}`} name={s.name} price={s.price} change={s.change} last={last}
+              highlight={interSet.has(s.symbol)}
+              onClick={()=>openStock(s.symbol)}
+              right={<span style={{fontSize:9,fontWeight:700,color:sigCol(s.marsV.signal)}}>{sigIcon(s.marsV.signal)}{sigLbl(s.marsV.signal)}</span>}/>
+          )}/>
+
+        {/* 컬럼 4: 텐베거 TOP30 */}
+        <Column icon="🚀" title="텐베거 TOP30" sub="5년 10배 잠재력 · R40+성장가속+TAM" borderCol="var(--pur-bd)"
+          items={screen?.top30TenBagger}
+          renderRow={(s,i,last)=>(
+            <ColRow key={s.symbol} sym={`${i+1}. ${s.symbol}`} name={s.name} price={s.price} change={s.change} last={last}
+              highlight={interSet.has(s.symbol)}
+              onClick={()=>openStock(s.symbol)}
+              right={<span className="mono" style={{fontSize:12,fontWeight:700,color:s.tenBagger>=70?'var(--green)':s.tenBagger>=50?'var(--gold)':'var(--dim2)'}}>{s.tenBagger}<span style={{fontSize:8,color:'var(--dim)'}}>점</span></span>}/>
+          )}/>
+      </div>
+
+      {interSet.size>0&&(
+        <div style={{margin:'8px 12px 0',fontSize:10,color:'var(--dim2)'}}>
+          <span style={{display:'inline-block',width:10,height:10,background:'var(--gold-bg)',border:'1px solid var(--gold-bd)',borderRadius:3,marginRight:5,verticalAlign:'-1px'}}/>
+          금색 배경 = 2개 이상 체계에서 동시 상위권 (이중 검증 · 신뢰도 높음)
+        </div>
       )}
 
-      {/* ⑦ 오늘의 경보 */}
+      {/* 경보 */}
       <SectionTitle>🚨 오늘의 경보</SectionTitle>
       {alerts.length===0
         ? <div style={{margin:'0 12px 8px',padding:'10px 14px',background:'var(--green-bg)',border:'1px solid var(--green-bd)',borderRadius:10,fontSize:11,color:'var(--dim2)'}}>✅ 현재 활성 경보 없음</div>
