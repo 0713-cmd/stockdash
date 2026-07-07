@@ -1,8 +1,8 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { STOCK_UNIVERSE, METRIC_META, getUniverseStock } from '../lib/data';
 import {
   calcCompositeSignal, calcReverseDCF, calcFCFYield, calcROICWACC,
-  calcPEPercentile, calcPositionSize, genFinancialHistory,
+  calcPEPercentile, calcPositionSize,
 } from '../lib/calculations';
 import {
   fmt, fmtK, pct, clr, sigBg, sigBd, SigBadge, MiniBar, SectionTitle, Row, MetricRow, BackBtn,
@@ -62,32 +62,58 @@ Beneish M-Score: ${s.beneish_m ?? 'N/A'}
   );
 }
 
-function FinChart({ hist }) {
-  if (!hist) return (
-    <div style={{margin:'0 12px 6px',padding:'14px',background:'var(--bg2)',borderRadius:14,border:'1px solid var(--line)',fontSize:11,color:'var(--dim)'}}>
-      재무 데이터 부족으로 추이를 재구성할 수 없습니다.
-    </div>
-  );
-  const yoy = (cur, prev) => prev ? (cur - prev) / prev * 100 : null;
+// 실제 공시 재무제표 표 (/api/financials)
+function FinTable({ sym }) {
+  const [fin, setFin] = useState(null);
+  const [err, setErr] = useState(null);
+  useEffect(() => {
+    let alive = true;
+    setFin(null); setErr(null);
+    fetch(`/api/financials?sym=${sym}`).then(r=>r.json()).then(d=>{
+      if (!alive) return;
+      if (d.error || !d.annual?.length) setErr(d.error || '데이터 없음');
+      else setFin(d);
+    }).catch(e=>{ if (alive) setErr(e.message); });
+    return ()=>{ alive = false; };
+  }, [sym]);
+
+  const yoy = (cur, prev) => (cur != null && prev) ? (cur - prev) / prev * 100 : null;
   const pctCell = v => v == null ? <span style={{color:'var(--dim)'}}>—</span>
     : <span style={{color:v>0?'var(--green)':v<0?'var(--red)':'var(--dim2)',fontWeight:600}}>{v>0?'+':''}{v.toFixed(1)}%</span>;
-
   const th = {fontSize:9,color:'var(--dim)',textAlign:'right',padding:'5px 6px',fontWeight:600,whiteSpace:'nowrap'};
   const td = {fontSize:11,textAlign:'right',padding:'5px 6px',whiteSpace:'nowrap'};
 
-  // 연간: 최근이 아래가 아니라 위로 (최신 먼저)
-  const annual = [...hist.annual].reverse();
-  // 분기: 최신 먼저, YoY는 4분기 전 대비
-  const quarters = hist.quarters.map((q,i)=>({ ...q, yoy: i>=4 ? yoy(q.revenue, hist.quarters[i-4].revenue) : null })).reverse();
+  if (err) return (
+    <div style={{margin:'0 12px 6px',padding:'14px',background:'var(--bg2)',borderRadius:14,border:'1px solid var(--line)',fontSize:11,color:'var(--dim)'}}>
+      공시 재무 데이터를 불러오지 못했습니다 ({err}). 새로고침 후 다시 시도해보세요.
+    </div>
+  );
+  if (!fin) return (
+    <div style={{margin:'0 12px 6px',padding:'14px',background:'var(--bg2)',borderRadius:14,border:'1px solid var(--line)',fontSize:11,color:'var(--dim)'}}>
+      ⏳ 공시 재무제표 불러오는 중...
+    </div>
+  );
+
+  // 최신이 맨 위
+  const annual = [...fin.annual].reverse();
+  // 분기: 최신 먼저, 전분기비 + (4분기 전 데이터 있으면) 전년동기비
+  const qAsc = fin.quarterly;
+  const quarters = qAsc.map((q,i)=>({
+    ...q,
+    qoq: i>0 ? yoy(q.revenue, qAsc[i-1].revenue) : null,
+    yoy: i>=4 ? yoy(q.revenue, qAsc[i-4].revenue) : null,
+  })).reverse();
+
+  const fy = d => `FY${d.slice(0,4)}.${d.slice(5,7)}`;
+  const qLabel = d => `${d.slice(0,4)}.${d.slice(5,7)}월 분기`;
 
   return (
     <div style={{margin:'0 12px 6px',background:'var(--bg2)',borderRadius:14,border:'1px solid var(--line)',overflow:'hidden'}}>
-      {/* 연간 테이블 */}
-      <div style={{padding:'12px 14px 4px',fontSize:11,fontWeight:700,color:'var(--strong)'}}>연간 실적 (5개년)</div>
-      <table style={{width:'100%',borderCollapse:'collapse',padding:'0 8px'}}>
+      <div style={{padding:'12px 14px 4px',fontSize:11,fontWeight:700,color:'var(--strong)'}}>연간 실적 — 실제 공시 기준</div>
+      <table style={{width:'100%',borderCollapse:'collapse'}}>
         <thead>
           <tr style={{borderBottom:'1px solid var(--line2)'}}>
-            <th style={{...th,textAlign:'left',paddingLeft:14}}>연도</th>
+            <th style={{...th,textAlign:'left',paddingLeft:14}}>회계연도</th>
             <th style={th}>매출</th>
             <th style={th}>전년비</th>
             <th style={th}>영업CF</th>
@@ -98,10 +124,10 @@ function FinChart({ hist }) {
           {annual.map((a,i)=>{
             const prev = annual[i+1];
             return (
-              <tr key={a.label} style={{borderBottom:i<annual.length-1?'1px solid var(--line)':'none',background:i===0?'var(--bg3)':'transparent'}}>
-                <td style={{...td,textAlign:'left',paddingLeft:14,color:i===0?'var(--gold)':'var(--text)',fontWeight:i===0?700:400}}>{a.label}{i===0&&' (최근)'}</td>
+              <tr key={a.date} style={{borderBottom:i<annual.length-1?'1px solid var(--line)':'none',background:i===0?'var(--bg3)':'transparent'}}>
+                <td style={{...td,textAlign:'left',paddingLeft:14,color:i===0?'var(--gold)':'var(--text)',fontWeight:i===0?700:400}}>{fy(a.date)}{i===0&&' (최근)'}</td>
                 <td className="mono" style={{...td,color:'var(--strong)',fontWeight:600}}>{fmtK(a.revenue)}</td>
-                <td className="mono" style={td}>{pctCell(prev?yoy(a.revenue,prev.revenue):null)}</td>
+                <td className="mono" style={td}>{pctCell(yoy(a.revenue, prev?.revenue))}</td>
                 <td className="mono" style={{...td,color:'var(--text)'}}>{fmtK(a.ocf)}</td>
                 <td className="mono" style={{...td,color:'var(--text)'}}>{fmtK(a.fcf)}</td>
               </tr>
@@ -110,31 +136,32 @@ function FinChart({ hist }) {
         </tbody>
       </table>
 
-      {/* 분기 테이블 */}
-      <div style={{padding:'14px 14px 4px',fontSize:11,fontWeight:700,color:'var(--strong)',borderTop:'1px solid var(--line2)',marginTop:6}}>분기별 매출 (최근 8분기)</div>
+      <div style={{padding:'14px 14px 4px',fontSize:11,fontWeight:700,color:'var(--strong)',borderTop:'1px solid var(--line2)',marginTop:6}}>분기별 매출 — 실제 공시 기준</div>
       <table style={{width:'100%',borderCollapse:'collapse'}}>
         <thead>
           <tr style={{borderBottom:'1px solid var(--line2)'}}>
             <th style={{...th,textAlign:'left',paddingLeft:14}}>분기</th>
             <th style={th}>매출</th>
+            <th style={th}>전분기비</th>
             <th style={th}>전년동기비</th>
             <th style={th}>매출총이익률</th>
           </tr>
         </thead>
         <tbody>
           {quarters.map((q,i)=>(
-            <tr key={i} style={{borderBottom:i<quarters.length-1?'1px solid var(--line)':'none',background:i===0?'var(--bg3)':'transparent'}}>
-              <td style={{...td,textAlign:'left',paddingLeft:14,color:i===0?'var(--gold)':'var(--text)',fontWeight:i===0?700:400}}>{i===0?'최근 분기':`${i}분기 전`}</td>
+            <tr key={q.date} style={{borderBottom:i<quarters.length-1?'1px solid var(--line)':'none',background:i===0?'var(--bg3)':'transparent'}}>
+              <td style={{...td,textAlign:'left',paddingLeft:14,color:i===0?'var(--gold)':'var(--text)',fontWeight:i===0?700:400}}>{qLabel(q.date)}{i===0&&' (최근)'}</td>
               <td className="mono" style={{...td,color:'var(--strong)',fontWeight:600}}>{fmtK(q.revenue)}</td>
+              <td className="mono" style={td}>{pctCell(q.qoq)}</td>
               <td className="mono" style={td}>{pctCell(q.yoy)}</td>
-              <td className="mono" style={{...td,color:'var(--text)'}}>{q.grossMargin.toFixed(1)}%</td>
+              <td className="mono" style={{...td,color:'var(--text)'}}>{q.grossProfit!=null&&q.revenue?`${(q.grossProfit/q.revenue*100).toFixed(1)}%`:'—'}</td>
             </tr>
           ))}
         </tbody>
       </table>
 
       <div style={{fontSize:9,color:'var(--dim)',padding:'10px 14px',lineHeight:1.6,borderTop:'1px solid var(--line)'}}>
-        ⚠️ 실제 공시 재무제표 원본이 아니라 현재 스냅샷(매출·마진·성장률) 기반 역산 추정치입니다. 절대값보다 추세(증가/감소) 참고용.
+        ✅ Yahoo Finance 공시(10-K/10-Q) 기준 실제 수치입니다. 분기 전년동기비는 공개 범위(최근 5개 분기) 제한으로 최근 분기에만 표시될 수 있습니다.
       </div>
     </div>
   );
@@ -155,7 +182,6 @@ export default function StockDetail({ sym, prices, macro, macroValues, onBack })
   const roic = calcROICWACC(s.roic,s.wacc);
   const pos = comp.signal==='BUY'&&cur ? calcPositionSize(parseFloat(comp.score||0),parseFloat(up||0)) : 0;
   const trendCol = t=>t==='accel'?'var(--green)':t==='down'?'var(--red)':'var(--dim2)';
-  const hist = genFinancialHistory(s);
   const holders = guruHoldersOf(sym);
   const sens = macroValues ? macroSensitivity(s, macroValues) : [];
   const comprehensive = calcComprehensiveScore(s, p);
@@ -251,7 +277,7 @@ export default function StockDetail({ sym, prices, macro, macroValues, onBack })
       </div>
 
       <SectionTitle>재무 추이</SectionTitle>
-      <FinChart hist={hist}/>
+      <FinTable sym={sym}/>
 
       {s.segments?.length>0&&(
         <>
