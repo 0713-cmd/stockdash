@@ -68,40 +68,73 @@ function FinChart({ hist }) {
       재무 데이터 부족으로 추이를 재구성할 수 없습니다.
     </div>
   );
-  const maxQRev = Math.max(...hist.quarters.map(q=>q.revenue));
-  const maxARev = Math.max(...hist.annual.map(a=>Math.max(a.revenue,a.fcf,a.ocf)));
+  const yoy = (cur, prev) => prev ? (cur - prev) / prev * 100 : null;
+  const pctCell = v => v == null ? <span style={{color:'var(--dim)'}}>—</span>
+    : <span style={{color:v>0?'var(--green)':v<0?'var(--red)':'var(--dim2)',fontWeight:600}}>{v>0?'+':''}{v.toFixed(1)}%</span>;
+
+  const th = {fontSize:9,color:'var(--dim)',textAlign:'right',padding:'5px 6px',fontWeight:600,whiteSpace:'nowrap'};
+  const td = {fontSize:11,textAlign:'right',padding:'5px 6px',whiteSpace:'nowrap'};
+
+  // 연간: 최근이 아래가 아니라 위로 (최신 먼저)
+  const annual = [...hist.annual].reverse();
+  // 분기: 최신 먼저, YoY는 4분기 전 대비
+  const quarters = hist.quarters.map((q,i)=>({ ...q, yoy: i>=4 ? yoy(q.revenue, hist.quarters[i-4].revenue) : null })).reverse();
+
   return (
-    <div style={{margin:'0 12px 6px',padding:'14px',background:'var(--bg2)',borderRadius:14,border:'1px solid var(--line)'}}>
-      <div style={{fontSize:10,color:'var(--dim)',marginBottom:8}}>분기별 매출 · 매출총이익률 추이 (최근 8분기)</div>
-      <div style={{display:'flex',alignItems:'flex-end',gap:4,height:74,marginBottom:16}}>
-        {hist.quarters.map((q,i)=>(
-          <div key={i} style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',gap:2}}>
-            <div style={{fontSize:8,color:'var(--dim2)'}}>{q.grossMargin.toFixed(0)}%</div>
-            <div style={{width:'100%',height:Math.max(4,q.revenue/maxQRev*50),background:'var(--gold)',opacity:.45+i*0.07,borderRadius:'3px 3px 0 0'}}/>
-            <div style={{fontSize:7,color:'var(--dim)'}}>{q.label}</div>
-          </div>
-        ))}
-      </div>
-      <div style={{fontSize:10,color:'var(--dim)',marginBottom:8}}>연간 매출 · 영업현금흐름 · FCF (5개년)</div>
-      <div style={{display:'flex',alignItems:'flex-end',gap:8,height:80}}>
-        {hist.annual.map((a,i)=>(
-          <div key={i} style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',gap:2}}>
-            <div style={{display:'flex',alignItems:'flex-end',gap:2,height:60}}>
-              <div style={{width:6,height:Math.max(3,a.revenue/maxARev*60),background:'var(--blue)',borderRadius:2}}/>
-              <div style={{width:6,height:Math.max(3,a.ocf/maxARev*60),background:'var(--green)',borderRadius:2}}/>
-              <div style={{width:6,height:Math.max(3,a.fcf/maxARev*60),background:'var(--gold)',borderRadius:2}}/>
-            </div>
-            <div style={{fontSize:7,color:'var(--dim)'}}>{a.label}</div>
-          </div>
-        ))}
-      </div>
-      <div style={{display:'flex',gap:10,marginTop:8,fontSize:9,color:'var(--dim2)'}}>
-        <span><span style={{display:'inline-block',width:8,height:8,background:'var(--blue)',borderRadius:2,marginRight:3}}/>매출</span>
-        <span><span style={{display:'inline-block',width:8,height:8,background:'var(--green)',borderRadius:2,marginRight:3}}/>영업CF</span>
-        <span><span style={{display:'inline-block',width:8,height:8,background:'var(--gold)',borderRadius:2,marginRight:3}}/>FCF</span>
-      </div>
-      <div style={{fontSize:9,color:'var(--dim)',marginTop:10,lineHeight:1.6}}>
-        ⚠️ 실제 공시 재무제표 원본이 아니라, 현재 스냅샷(매출·마진·성장률)을 근거로 역산 재구성한 추정 추이입니다. 절대값보다 방향성(우상향/우하향) 참고용입니다.
+    <div style={{margin:'0 12px 6px',background:'var(--bg2)',borderRadius:14,border:'1px solid var(--line)',overflow:'hidden'}}>
+      {/* 연간 테이블 */}
+      <div style={{padding:'12px 14px 4px',fontSize:11,fontWeight:700,color:'var(--strong)'}}>연간 실적 (5개년)</div>
+      <table style={{width:'100%',borderCollapse:'collapse',padding:'0 8px'}}>
+        <thead>
+          <tr style={{borderBottom:'1px solid var(--line2)'}}>
+            <th style={{...th,textAlign:'left',paddingLeft:14}}>연도</th>
+            <th style={th}>매출</th>
+            <th style={th}>전년비</th>
+            <th style={th}>영업CF</th>
+            <th style={th}>FCF</th>
+          </tr>
+        </thead>
+        <tbody>
+          {annual.map((a,i)=>{
+            const prev = annual[i+1];
+            return (
+              <tr key={a.label} style={{borderBottom:i<annual.length-1?'1px solid var(--line)':'none',background:i===0?'var(--bg3)':'transparent'}}>
+                <td style={{...td,textAlign:'left',paddingLeft:14,color:i===0?'var(--gold)':'var(--text)',fontWeight:i===0?700:400}}>{a.label}{i===0&&' (최근)'}</td>
+                <td className="mono" style={{...td,color:'var(--strong)',fontWeight:600}}>{fmtK(a.revenue)}</td>
+                <td className="mono" style={td}>{pctCell(prev?yoy(a.revenue,prev.revenue):null)}</td>
+                <td className="mono" style={{...td,color:'var(--text)'}}>{fmtK(a.ocf)}</td>
+                <td className="mono" style={{...td,color:'var(--text)'}}>{fmtK(a.fcf)}</td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+
+      {/* 분기 테이블 */}
+      <div style={{padding:'14px 14px 4px',fontSize:11,fontWeight:700,color:'var(--strong)',borderTop:'1px solid var(--line2)',marginTop:6}}>분기별 매출 (최근 8분기)</div>
+      <table style={{width:'100%',borderCollapse:'collapse'}}>
+        <thead>
+          <tr style={{borderBottom:'1px solid var(--line2)'}}>
+            <th style={{...th,textAlign:'left',paddingLeft:14}}>분기</th>
+            <th style={th}>매출</th>
+            <th style={th}>전년동기비</th>
+            <th style={th}>매출총이익률</th>
+          </tr>
+        </thead>
+        <tbody>
+          {quarters.map((q,i)=>(
+            <tr key={i} style={{borderBottom:i<quarters.length-1?'1px solid var(--line)':'none',background:i===0?'var(--bg3)':'transparent'}}>
+              <td style={{...td,textAlign:'left',paddingLeft:14,color:i===0?'var(--gold)':'var(--text)',fontWeight:i===0?700:400}}>{i===0?'최근 분기':`${i}분기 전`}</td>
+              <td className="mono" style={{...td,color:'var(--strong)',fontWeight:600}}>{fmtK(q.revenue)}</td>
+              <td className="mono" style={td}>{pctCell(q.yoy)}</td>
+              <td className="mono" style={{...td,color:'var(--text)'}}>{q.grossMargin.toFixed(1)}%</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+
+      <div style={{fontSize:9,color:'var(--dim)',padding:'10px 14px',lineHeight:1.6,borderTop:'1px solid var(--line)'}}>
+        ⚠️ 실제 공시 재무제표 원본이 아니라 현재 스냅샷(매출·마진·성장률) 기반 역산 추정치입니다. 절대값보다 추세(증가/감소) 참고용.
       </div>
     </div>
   );
