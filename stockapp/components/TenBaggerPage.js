@@ -25,7 +25,7 @@ export default function TenBaggerPage({ prices, openStock }) {
 
   return (
     <div style={{paddingBottom:80}}>
-      <div style={{padding:'14px 16px 4px',fontSize:20,fontWeight:700,color:'#fff'}}>🚀 텐베거 TOP{Math.min(10,list.length)}</div>
+      <div style={{padding:'14px 16px 4px',fontSize:20,fontWeight:700,color:'var(--strong)'}}>🚀 텐베거 TOP{Math.min(10,list.length)}</div>
       <div style={{padding:'0 16px 10px',fontSize:11,color:'var(--dim)'}}>5년 내 10배 가능성 · Rule of 40 / 성장가속 / TAM / GM트렌드 / 품질 합산 · 탭하면 재무 상세</div>
       {visible.map((s,idx)=>{
         const col=s.ten>=70?'var(--green)':s.ten>=50?'var(--gold)':'var(--dim2)';
@@ -42,13 +42,13 @@ export default function TenBaggerPage({ prices, openStock }) {
               <ScoreRing score={s.ten} size={48}/>
               <div style={{flex:1,minWidth:0}}>
                 <div style={{display:'flex',gap:6,alignItems:'center',marginBottom:3}}>
-                  <span className="mono" style={{fontSize:14,fontWeight:700,color:'#fff'}}>{s.sym}</span>
+                  <span className="mono" style={{fontSize:14,fontWeight:700,color:'var(--strong)'}}>{s.sym}</span>
                   {s.ten>=70&&<span style={{fontSize:8,padding:'1px 6px',borderRadius:10,background:'var(--pur-bg)',border:'1px solid var(--pur-bd)',color:'var(--pur)'}}>텐베거 후보</span>}
                 </div>
                 <div style={{fontSize:11,color:'var(--dim2)'}}>{s.name} · R40:{s.r40} · 성장+{s.rev_growth_yoy}%</div>
               </div>
               <div style={{textAlign:'right'}}>
-                <div className="mono" style={{fontSize:12,fontWeight:700,color:'#fff'}}>{s.cur?`$${fmt(s.cur)}`:'—'}</div>
+                <div className="mono" style={{fontSize:12,fontWeight:700,color:'var(--strong)'}}>{s.cur?`$${fmt(s.cur)}`:'—'}</div>
                 {s.up!=null&&<div style={{fontSize:10,color:s.up>0?'var(--green)':'var(--red)',fontWeight:600}}>{pct(s.up)}</div>}
               </div>
             </div>
@@ -63,7 +63,7 @@ export default function TenBaggerPage({ prices, openStock }) {
                 </div>
               ))}
               <div style={{display:'flex',justifyContent:'space-between',marginTop:6,paddingTop:6,borderTop:'1px solid var(--line)'}}>
-                <span style={{fontSize:11,fontWeight:700,color:'#fff'}}>합계</span>
+                <span style={{fontSize:11,fontWeight:700,color:'var(--strong)'}}>합계</span>
                 <span className="mono" style={{fontSize:11,fontWeight:700,color:col}}>{s.ten}/100</span>
               </div>
             </div>

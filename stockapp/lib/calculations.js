@@ -10,6 +10,13 @@ export function calcReverseDCF(stock, currentPrice) {
   if (!currentPrice || !fair_value) return { score: 0, label: '데이터 없음' };
 
   const gap = (fair_value - currentPrice) / currentPrice * 100;
+
+  // 데이터 정합성 가드: 갭이 +200% 초과면 액면분할 미반영 등
+  // fair_value 기준 오류 가능성이 높으므로 신호에서 제외한다.
+  if (gap > 200) {
+    return { score: 0, gap: gap.toFixed(1), fair_value, label: '⚠️ 기준가 검증 필요(액면분할 의심)', suspect: true };
+  }
+
   let score = 0;
   if (gap > 20) score = 2;
   else if (gap > 10) score = 1.5;
@@ -333,6 +340,161 @@ export function genFinancialHistory(stock) {
   }
 
   return { quarters, annual, estimated: true };
+}
+
+// ── 종합점수 (인베스팅닷컴 건전성 점수 철학) ─────
+// 밸류에이션 30 + 성장 25 + 수익성 20 + 건전성 15 + 모멘텀 10 = 100
+// 라이트 종목(재무 원본 없음)은 가격 기반 지표만으로 부분 채점하고
+// 채점 가능했던 배점 대비 백분율로 환산(fabricate 하지 않음).
+export function calcComprehensiveScore(stock, priceData) {
+  const p = priceData || {};
+  const breakdown = { value: 0, growth: 0, profitability: 0, health: 0, momentum: 0 };
+  let maxPossible = 0;
+
+  // ── 밸류에이션 30점 ──
+  // PE (섹터 대비 근사: forward PE < trailing PE = 이익 성장 기대) 10점
+  const pe = p.trailingPE ?? (p.price && stock.eps_ttm > 0 ? p.price / stock.eps_ttm : null);
+  if (pe != null && pe > 0) {
+    maxPossible += 10;
+    if (pe < 15) breakdown.value += 10;
+    else if (pe < 25) breakdown.value += 7;
+    else if (pe < 40) breakdown.value += 4;
+    else if (pe < 60) breakdown.value += 2;
+  }
+  // PEG 10점 (forward EPS 성장률 근사 사용)
+  let peg = null;
+  if (pe != null && p.epsForward && p.eps && p.eps > 0 && p.epsForward > p.eps) {
+    const growthPct = (p.epsForward - p.eps) / p.eps * 100;
+    if (growthPct > 1) peg = pe / growthPct;
+  } else if (pe != null && stock.rev_growth_yoy > 1) {
+    peg = pe / stock.rev_growth_yoy;
+  }
+  if (peg != null) {
+    maxPossible += 10;
+    if (peg < 1) breakdown.value += 10;
+    else if (peg < 2) breakdown.value += 5;
+  }
+  // 애널리스트 목표가 대비 상승여력 10점 (EV/FCF 대체 — 라이트 종목도 계산 가능)
+  const target = p.targetMean;
+  if (target && p.price) {
+    maxPossible += 10;
+    const upsidePct = (target - p.price) / p.price * 100;
+    if (upsidePct > 25) breakdown.value += 10;
+    else if (upsidePct > 15) breakdown.value += 7;
+    else if (upsidePct > 5) breakdown.value += 4;
+    else if (upsidePct > 0) breakdown.value += 2;
+  }
+
+  // ── 성장 25점 ──
+  if (stock.rev_growth_yoy != null) {
+    maxPossible += 15;
+    if (stock.rev_growth_yoy > 30) breakdown.growth += 15;
+    else if (stock.rev_growth_yoy > 15) breakdown.growth += 10;
+    else if (stock.rev_growth_yoy > 0) breakdown.growth += 5;
+  }
+  // EPS 성장 (forward vs trailing) 10점
+  if (p.epsForward != null && p.eps != null && p.eps > 0) {
+    maxPossible += 10;
+    const epsG = (p.epsForward - p.eps) / p.eps * 100;
+    if (epsG > 30) breakdown.growth += 10;
+    else if (epsG > 15) breakdown.growth += 5;
+    else if (epsG > 0) breakdown.growth += 2;
+  }
+
+  // ── 수익성 20점 ──
+  if (stock.gross_margin != null) {
+    maxPossible += 10;
+    if (stock.gross_margin > 60) breakdown.profitability += 10;
+    else if (stock.gross_margin > 40) breakdown.profitability += 5;
+    else if (stock.gross_margin > 25) breakdown.profitability += 2;
+  }
+  if (stock.roic != null) {
+    maxPossible += 10;
+    if (stock.roic > 20) breakdown.profitability += 10;
+    else if (stock.roic > 10) breakdown.profitability += 5;
+  }
+
+  // ── 건전성 15점 ──
+  if (stock.piotroski != null) {
+    maxPossible += 10;
+    if (stock.piotroski >= 7) breakdown.health += 10;
+    else if (stock.piotroski >= 4) breakdown.health += 5;
+  }
+  if (stock.altman_z != null) {
+    maxPossible += 5;
+    if (stock.altman_z > 2.99) breakdown.health += 5;
+    else if (stock.altman_z > 1.81) breakdown.health += 2;
+  }
+
+  // ── 모멘텀 10점 ──
+  // 50일/200일 이평선 대비 위치 (가격 데이터만으로 계산 가능)
+  if (p.fiftyDayChgPct != null || p.twoHundredDayChgPct != null || stock.mom_12_1 != null) {
+    maxPossible += 10;
+    let momPts = 0;
+    if (p.twoHundredDayChgPct != null) {
+      if (p.twoHundredDayChgPct > 15) momPts = 10;
+      else if (p.twoHundredDayChgPct > 5) momPts = 7;
+      else if (p.twoHundredDayChgPct > 0) momPts = 4;
+    } else if (stock.mom_12_1 != null) {
+      if (stock.mom_12_1 > 30) momPts = 10;
+      else if (stock.mom_12_1 > 15) momPts = 7;
+      else if (stock.mom_12_1 > 0) momPts = 4;
+    }
+    breakdown.momentum += momPts;
+  }
+
+  const raw = breakdown.value + breakdown.growth + breakdown.profitability + breakdown.health + breakdown.momentum;
+  // 채점된 배점 대비 백분율 환산 (커버리지 40점 미만이면 신뢰도 낮음 표시)
+  const score = maxPossible > 0 ? Math.round(raw / maxPossible * 100) : 0;
+  const coverage = maxPossible; // 채점 가능했던 총 배점 (최대 100)
+
+  let grade;
+  if (score >= 80) grade = 'A+';
+  else if (score >= 70) grade = 'A';
+  else if (score >= 60) grade = 'B+';
+  else if (score >= 50) grade = 'B';
+  else if (score >= 40) grade = 'C';
+  else grade = 'D';
+
+  return { score, grade, breakdown, coverage, lowConfidence: coverage < 40 };
+}
+
+// ── 주간 스크리닝 (3대 체계 동시 실행) ──────────
+export function screenUniverse(stocksWithPrices, treasury10y = 4.42) {
+  const withScores = stocksWithPrices
+    .filter(s => s.priceData?.price)
+    .map(s => ({
+      symbol: s.symbol,
+      name: s.priceData?.name || s.name || s.symbol,
+      sector: s.priceData?.sector || s.sector,
+      lite: s.lite,
+      price: s.priceData.price,
+      change: s.priceData.change,
+      targetMean: s.priceData.targetMean,
+      recommendation: s.priceData.recommendation,
+      comprehensive: calcComprehensiveScore(s, s.priceData),
+      marsV: calcCompositeSignal(s, s.priceData.price, treasury10y),
+      tenBagger: s.rev_growth_yoy != null ? calcTenBaggerScore(s) : null,
+      ruleOf40: s.rule_of_40 ?? (s.gross_margin != null && s.rev_growth_yoy != null ? Math.round(s.gross_margin + s.rev_growth_yoy - 100) : null),
+      revGrowth: s.rev_growth_yoy,
+    }));
+
+  const top30Comprehensive = [...withScores]
+    .filter(s => !s.comprehensive.lowConfidence || !s.lite)
+    .sort((a, b) => b.comprehensive.score - a.comprehensive.score)
+    .slice(0, 30);
+
+  const top30MarsV = [...withScores]
+    .filter(s => s.marsV.signal !== 'DANGER' && s.marsV.signal !== 'UNKNOWN' && !s.lite)
+    .sort((a, b) => parseFloat(b.marsV.score) - parseFloat(a.marsV.score))
+    .slice(0, 30);
+
+  const top30TenBagger = [...withScores]
+    .filter(s => s.tenBagger != null)
+    .sort((a, b) => b.tenBagger - a.tenBagger)
+    .slice(0, 30);
+
+  return { top30Comprehensive, top30MarsV, top30TenBagger, screened: withScores.length };
 }
 
 // ── 손절·익절 경보 ──────────────────────────────

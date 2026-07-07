@@ -23,7 +23,7 @@ export default function StocksPage({ prices, loading, macro, openStock }) {
   return (
     <div style={{paddingBottom:80}}>
       <div style={{padding:'14px 16px 6px',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
-        <span style={{fontSize:20,fontWeight:700,color:'#fff'}}>📊 종목</span>
+        <span style={{fontSize:20,fontWeight:700,color:'var(--strong)'}}>📊 종목</span>
         <div style={{display:'flex',gap:5}}>
           {[['BUY',buyCnt,'var(--green)'],['HOLD',holdCnt,'var(--gold)'],['WAIT',waitCnt,'var(--red)']].map(([l,n,c])=>(
             <div key={l} style={{padding:'2px 8px',borderRadius:20,fontSize:9,fontWeight:700,color:c,background:'rgba(0,0,0,.3)',border:`1px solid ${c}40`}}>{l} {n}</div>
@@ -51,14 +51,14 @@ export default function StocksPage({ prices, loading, macro, openStock }) {
             <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:4}}>
               <div>
                 <div style={{display:'flex',gap:6,alignItems:'center',marginBottom:2}}>
-                  <span className="mono" style={{fontWeight:700,fontSize:14,color:'#fff'}}>{s.sym}</span>
+                  <span className="mono" style={{fontWeight:700,fontSize:14,color:'var(--strong)'}}>{s.sym}</span>
                   <SigBadge s={s.comp.signal} sm/>
                   {s.type==='watch'&&<span style={{fontSize:8,color:'var(--dim)',border:'1px solid var(--line2)',borderRadius:2,padding:'1px 4px'}}>트래킹</span>}
                 </div>
                 <div style={{fontSize:10,color:'var(--dim2)'}}>{s.name} · {s.sector}</div>
               </div>
               <div style={{textAlign:'right'}}>
-                <div className="mono" style={{fontSize:15,fontWeight:700,color:'#fff'}}>{s.cur?`$${fmt(s.cur)}`:loading?'⋯':'—'}</div>
+                <div className="mono" style={{fontSize:15,fontWeight:700,color:'var(--strong)'}}>{s.cur?`$${fmt(s.cur)}`:loading?'⋯':'—'}</div>
                 {s.chg!=null&&<div className={`mono ${clr(s.chg)}`} style={{fontSize:10,marginTop:1}}>{s.chg>0?'▲':'▼'}{Math.abs(s.chg).toFixed(2)}%</div>}
               </div>
             </div>

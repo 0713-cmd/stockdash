@@ -2,6 +2,7 @@
 // 핵심 투자 데이터 — lib/data.js
 // 매분기 업데이트: 구루 포지션, 재무 기초, 기대값
 // ═══════════════════════════════════════════════════
+import { universeMeta } from './universe';
 
 export const STOCK_UNIVERSE = {
   // ── 보유 종목 ────────────────────────────────────
@@ -1299,3 +1300,37 @@ export const METHOD_WEIGHTS = {
   erv: 0.07,            // 어닝 리비전 모멘텀
   guru_13f: 0.08,       // Cohen et al. 2010 +6%p
 };
+
+// ── 200종목 유니버스 폴백 조회 ────────────────────
+// STOCK_UNIVERSE(정밀 큐레이션 39종목)에 있으면 그 전체 데이터를,
+// 없으면 lib/universe.js 메타 + 최소 스텁을 반환한다.
+// 라이트 종목은 fair_value/piotroski 등 재무 원본이 없으므로
+// null로 두고, 가격 기반 지표(PE/PEG/모멘텀/종합점수)만 계산된다.
+export function getUniverseStock(symbol) {
+  const curated = STOCK_UNIVERSE[symbol];
+  if (curated) return { ...curated, symbol, lite: false };
+
+  const meta = universeMeta(symbol);
+  return {
+    symbol,
+    name: symbol,
+    nameEn: symbol,
+    flag: '🇺🇸',
+    sector: meta?.sector || '기타',
+    category: meta?.category || null,
+    type: 'universe',
+    lite: true,
+    fair_value: null, fair_low: null, fair_high: null,
+    eps_ttm: null, revenue_ttm: null,
+    fcf_annual: null, sbc_annual: null, shares_out: null, net_cash: null,
+    piotroski: null, beneish_m: null, altman_z: null,
+    roic: null, wacc: null,
+    mom_12_1: null, erv_score: null,
+    rev_growth_yoy: null, rev_growth_accel: null,
+    gross_margin: null, gm_trend: null,
+    rule_of_40: null, tam_penetration: null,
+    guru_cost: null, guru_cost_type: null, guru_note: null,
+    segments: [], key_risk: null, key_oppty: null,
+    pe_hist_avg_5y: null, pe_hist_min_5y: null, pe_hist_max_5y: null,
+  };
+}

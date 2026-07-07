@@ -28,7 +28,7 @@ function GuruCard({ g, prices }) {
       <div style={{padding:'12px 14px',borderBottom:'1px solid var(--line)'}}>
         <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:8}}>
           <div>
-            <div style={{fontSize:14,fontWeight:700,color:'#fff'}}>{g.name}</div>
+            <div style={{fontSize:14,fontWeight:700,color:'var(--strong)'}}>{g.name}</div>
             <div style={{fontSize:10,color:'var(--dim2)',marginTop:1}}>{g.fund} · AUM ${g.aum_b}B · {g.updated}</div>
           </div>
           <span style={{fontSize:8,padding:'2px 8px',borderRadius:10,background:g.tier===1?'var(--gold-bg)':'var(--pur-bg)',border:`1px solid ${g.tier===1?'var(--gold-bd)':'var(--pur-bd)'}`,color:g.tier===1?'var(--gold)':'var(--pur)',fontWeight:700}}>T{g.tier}</span>
@@ -48,7 +48,7 @@ function GuruCard({ g, prices }) {
           <div key={j} style={{padding:'10px 14px',borderBottom:j<g.positions.length-1?'1px solid var(--line)':'none'}}>
             <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:4}}>
               <div style={{display:'flex',gap:6,alignItems:'center'}}>
-                <span className="mono" style={{fontWeight:700,fontSize:13,color:'#fff'}}>{pos.sym}</span>
+                <span className="mono" style={{fontWeight:700,fontSize:13,color:'var(--strong)'}}>{pos.sym}</span>
                 <span style={{fontSize:9,padding:'1px 7px',borderRadius:10,background:st.bg,border:`1px solid ${st.bd}`,color:st.col,fontWeight:700}}>{st.l}</span>
                 {pos.cost_type==='확인값'&&<span style={{fontSize:8,color:'var(--green)'}}>✓확인</span>}
               </div>
@@ -73,14 +73,14 @@ export default function MacroGuruPage({ macro, prices, openMacro }) {
 
   return (
     <div style={{paddingBottom:80}}>
-      <div style={{padding:'14px 16px 8px',fontSize:20,fontWeight:700,color:'#fff'}}>📡 매크로 · 구루</div>
+      <div style={{padding:'14px 16px 8px',fontSize:20,fontWeight:700,color:'var(--strong)'}}>📡 매크로 · 구루</div>
       <Segmented value={seg} onChange={setSeg} options={[['macro','📡 매크로'],['guru','🧠 투자구루']]}/>
 
       {seg==='macro' && (
         <>
           <div style={{margin:'0 12px 10px',padding:'12px 14px',background:'var(--bg2)',borderRadius:14,border:'1px solid var(--gold-bd)'}}>
             <div style={{fontSize:9,color:'var(--gold)',textTransform:'uppercase',letterSpacing:'.1em',marginBottom:4}}>현재 시장 레짐</div>
-            <div style={{fontSize:15,fontWeight:700,color:'#fff',marginBottom:3}}>{m.regime}</div>
+            <div style={{fontSize:15,fontWeight:700,color:'var(--strong)',marginBottom:3}}>{m.regime}</div>
             <div style={{fontSize:11,color:'var(--dim2)',lineHeight:1.6}}>{m.regime_detail}<br/>권고: 주식 <b style={{color:'var(--gold)'}}>{m.stock_cash_ratio}%</b> / 현금 <b style={{color:'var(--gold)'}}>{100-m.stock_cash_ratio}%</b></div>
           </div>
           <SectionTitle>지표 한눈에 보기 (탭하면 해설·역사적 사례)</SectionTitle>

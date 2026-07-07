@@ -8,7 +8,7 @@ export const THEMES = {
     label: '🌙 다크', icon: '🌙',
     vars: `
       --bg:#0b0c12;--bg2:#12131e;--bg3:#1a1b2a;--bg4:#222336;
-      --text:#dde0f0;--dim:#55597a;--dim2:#8890b0;
+      --text:#dde0f0;--strong:#ffffff;--dim:#55597a;--dim2:#8890b0;
       --line:rgba(255,255,255,0.05);--line2:rgba(255,255,255,0.10);
       --gold:#c9a84c;--gold2:#e8c87a;
       --green:#00d98a;--red:#ff3f5c;--blue:#4d9fff;--pur:#9b8fff;
@@ -19,34 +19,34 @@ export const THEMES = {
       --blue-bg:rgba(77,159,255,.10);--blue-bd:rgba(77,159,255,.28);
     `,
   },
-  claude: {
-    label: '🟣 Claude', icon: '🟣',
+  light: {
+    label: '☀️ 라이트', icon: '☀️',
     vars: `
-      --bg:#0d0a1a;--bg2:#13102a;--bg3:#1e1a3a;--bg4:#2a2550;
-      --text:#f0eaff;--dim:#6050a0;--dim2:#a090d0;
-      --line:rgba(180,140,255,0.08);--line2:rgba(180,140,255,0.16);
-      --gold:#d4a0ff;--gold2:#e8c8ff;
-      --green:#7eeac0;--red:#ff7090;--blue:#90c0ff;--pur:#c084fc;
-      --green-bg:rgba(126,234,192,.10);--green-bd:rgba(126,234,192,.25);
-      --red-bg:rgba(255,112,144,.10);--red-bd:rgba(255,112,144,.25);
-      --gold-bg:rgba(212,160,255,.10);--gold-bd:rgba(212,160,255,.28);
-      --pur-bg:rgba(192,132,252,.10);--pur-bd:rgba(192,132,252,.28);
-      --blue-bg:rgba(144,192,255,.10);--blue-bd:rgba(144,192,255,.28);
+      --bg:#f5f5f7;--bg2:#ffffff;--bg3:#f0f0f2;--bg4:#e2e2e6;
+      --text:#1a1a1a;--strong:#000000;--dim:#8a8a8a;--dim2:#5a5a66;
+      --line:rgba(0,0,0,0.07);--line2:rgba(0,0,0,0.13);
+      --gold:#b8923a;--gold2:#96731f;
+      --green:#0f9d58;--red:#d93025;--blue:#1a73e8;--pur:#7c4dff;
+      --green-bg:rgba(15,157,88,.08);--green-bd:rgba(15,157,88,.30);
+      --red-bg:rgba(217,48,37,.08);--red-bd:rgba(217,48,37,.30);
+      --gold-bg:rgba(184,146,58,.10);--gold-bd:rgba(184,146,58,.35);
+      --pur-bg:rgba(124,77,255,.08);--pur-bd:rgba(124,77,255,.30);
+      --blue-bg:rgba(26,115,232,.08);--blue-bd:rgba(26,115,232,.30);
     `,
   },
-  finance: {
-    label: '📊 Finance', icon: '📊',
+  claude: {
+    label: '🧡 Claude', icon: '🧡',
     vars: `
-      --bg:#071015;--bg2:#0d1a22;--bg3:#122330;--bg4:#1a3040;
-      --text:#c8dde8;--dim:#3a5a6a;--dim2:#6a9aaa;
-      --line:rgba(100,180,220,0.07);--line2:rgba(100,180,220,0.14);
-      --gold:#f0c040;--gold2:#ffe080;
-      --green:#00e5a0;--red:#ff4060;--blue:#40c0ff;--pur:#8060ff;
-      --green-bg:rgba(0,229,160,.10);--green-bd:rgba(0,229,160,.25);
-      --red-bg:rgba(255,64,96,.10);--red-bd:rgba(255,64,96,.25);
-      --gold-bg:rgba(240,192,64,.10);--gold-bd:rgba(240,192,64,.28);
-      --pur-bg:rgba(128,96,255,.10);--pur-bd:rgba(128,96,255,.28);
-      --blue-bg:rgba(64,192,255,.10);--blue-bd:rgba(64,192,255,.28);
+      --bg:#faf9f5;--bg2:#ffffff;--bg3:#f0eee6;--bg4:#e4e1d5;
+      --text:#3d3929;--strong:#1f1c10;--dim:#a09a85;--dim2:#6e6852;
+      --line:rgba(61,57,41,0.08);--line2:rgba(61,57,41,0.15);
+      --gold:#c96442;--gold2:#a94f30;
+      --green:#788c5d;--red:#bd5d3a;--blue:#5c7c9d;--pur:#8d7a9e;
+      --green-bg:rgba(120,140,93,.10);--green-bd:rgba(120,140,93,.32);
+      --red-bg:rgba(189,93,58,.10);--red-bd:rgba(189,93,58,.32);
+      --gold-bg:rgba(201,100,66,.09);--gold-bd:rgba(201,100,66,.32);
+      --pur-bg:rgba(141,122,158,.10);--pur-bd:rgba(141,122,158,.32);
+      --blue-bg:rgba(92,124,157,.10);--blue-bd:rgba(92,124,157,.32);
     `,
   },
 };
@@ -94,6 +94,8 @@ export function computeMacroValues(m) {
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // localStorage 훅
+// 주의: 브라우저 로컬 저장이므로 기기(또는 브라우저)가 바뀌면
+// 포트폴리오·일지 데이터가 따라가지 않습니다.
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 export function useLS(key, init) {
   const [val, setVal] = useState(init);
@@ -128,6 +130,10 @@ export function Chip({ label, val, col }) {
 
 export function UpsideBar({ cur, fair, low, high }) {
   if (!cur || !fair) return null;
+  const upCheck = (fair - cur) / cur * 100;
+  if (upCheck > 200) {
+    return <div style={{fontSize:9,color:'var(--dim)',marginTop:4}}>⚠️ 목표가 기준 검증 필요 (액면분할 가능성) — 업사이드 표시 보류</div>;
+  }
   const mn=Math.min(low??fair*.65,cur*.85),mx=Math.max(high??fair*1.35,cur*1.15);
   const rng=mx-mn||1,cp=Math.max(2,Math.min(96,(cur-mn)/rng*100)),fp=Math.max(2,Math.min(96,(fair-mn)/rng*100));
   const up=(fair-cur)/cur*100,col=up>0?'var(--green)':'var(--red)';
@@ -214,15 +220,17 @@ export function StockCompactRow({ s, onClick, rightLabel }) {
   return (
     <div onClick={onClick} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'8px 12px',cursor:'pointer'}}>
       <div style={{display:'flex',gap:7,alignItems:'center',minWidth:0}}>
-        <span className="mono" style={{fontWeight:700,fontSize:12,color:'#fff',width:46,flexShrink:0}}>{s.sym}</span>
+        <span className="mono" style={{fontWeight:700,fontSize:12,color:'var(--strong)',width:46,flexShrink:0}}>{s.sym}</span>
         <div style={{minWidth:0}}>
           <div style={{fontSize:10,color:'var(--text)',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{s.name}</div>
           {s.fair_value&&<div style={{fontSize:9,color:'var(--dim)'}}>목표 ${fmt(s.fair_value,0)}</div>}
         </div>
       </div>
       <div style={{textAlign:'right',flexShrink:0}}>
-        <div className="mono" style={{fontSize:12,fontWeight:700,color:'#fff'}}>{s.cur?`$${fmt(s.cur)}`:'—'}</div>
-        {rightLabel!=null ? rightLabel : (s.up!=null && <div style={{fontSize:10,fontWeight:600,color:s.up>0?'var(--green)':'var(--red)'}}>{pct(s.up)}</div>)}
+        <div className="mono" style={{fontSize:12,fontWeight:700,color:'var(--strong)'}}>{s.cur?`$${fmt(s.cur)}`:'—'}</div>
+        {rightLabel!=null ? rightLabel : (s.up!=null && (s.up>200
+          ? <div style={{fontSize:9,color:'var(--dim)'}}>⚠️검증필요</div>
+          : <div style={{fontSize:10,fontWeight:600,color:s.up>0?'var(--green)':'var(--red)'}}>{pct(s.up)}</div>))}
       </div>
     </div>
   );

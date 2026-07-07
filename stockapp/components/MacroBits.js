@@ -41,7 +41,7 @@ export function MacroDetail({ mkey, value, onBack }) {
         <div style={{fontSize:11,color:'var(--dim)',cursor:'pointer',marginBottom:8}} onClick={onBack}>← 뒤로</div>
         <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:4}}>
           <span style={{fontSize:22}}>{meta.icon}</span>
-          <span style={{fontSize:18,fontWeight:700,color:'#fff'}}>{meta.label}</span>
+          <span style={{fontSize:18,fontWeight:700,color:'var(--strong)'}}>{meta.label}</span>
         </div>
       </div>
 

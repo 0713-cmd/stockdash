@@ -44,7 +44,7 @@ export default function App() {
   useEffect(()=>{ fetchAll(); const id=setInterval(fetchAll,5*60*1000); return()=>clearInterval(id); },[fetchAll]);
 
   const cycleTheme = () => {
-    const order=['dark','claude','finance'];
+    const order=['dark','light','claude'];
     setTheme(prev=>order[(order.indexOf(prev)+1)%order.length]);
   };
 

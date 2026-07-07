@@ -1,12 +1,64 @@
-import { STOCK_UNIVERSE, METRIC_META } from '../lib/data';
+import { useState } from 'react';
+import { STOCK_UNIVERSE, METRIC_META, getUniverseStock } from '../lib/data';
 import {
   calcCompositeSignal, calcReverseDCF, calcFCFYield, calcROICWACC,
   calcPEPercentile, calcPositionSize, genFinancialHistory,
 } from '../lib/calculations';
 import {
-  fmt, pct, clr, sigBg, sigBd, SigBadge, MiniBar, SectionTitle, Row, MetricRow,
+  fmt, fmtK, pct, clr, sigBg, sigBd, SigBadge, MiniBar, SectionTitle, Row, MetricRow,
 } from './shared';
 import { guruHoldersOf, macroSensitivity } from './stockUtils';
+
+// Claude 정밀분석 프롬프트 복사 버튼
+function AnalysisPromptButton({ sym, s, p }) {
+  const [copied, setCopied] = useState(false);
+  const buildPrompt = () => {
+    const today = new Date().toLocaleDateString('ko-KR');
+    const peg = p?.trailingPE && p?.epsForward && p?.eps > 0 && p.epsForward > p.eps
+      ? (p.trailingPE / ((p.epsForward - p.eps) / p.eps * 100)).toFixed(2) : 'N/A';
+    return `${sym}(${p?.name || s.name || sym}) 정밀분석 요청
+
+현재가: $${p?.price ?? '?'} (${today} 기준)
+PER(TTM): ${p?.trailingPE ?? 'N/A'}x / Forward PER: ${p?.forwardPE ?? 'N/A'}x
+PEG: ${peg}
+52주 범위: $${p?.low52 ?? '?'}~$${p?.high52 ?? '?'}
+시가총액: ${p?.mktCap ? fmtK(p.mktCap) : 'N/A'}
+섹터: ${p?.sector || s.sector || 'N/A'}
+애널리스트 목표가: 평균 $${p?.targetMean ?? 'N/A'} (${p?.numAnalysts ?? '?'}명, 등급 ${p?.recommendation ?? 'N/A'})
+
+역산DCF 기대값(내 계산): ${s.fair_value ? `$${s.fair_value} (범위 $${s.fair_low}~$${s.fair_high})` : '미산정'}
+Piotroski F-Score: ${s.piotroski ?? 'N/A'}/9
+Beneish M-Score: ${s.beneish_m ?? 'N/A'}
+
+위 데이터를 기반으로 모부신 역산DCF 3단계 + 투자대가 10인 통합분석 + 퀀트 스코어카드를 수행해줘. 현재 시장 맥락은 최신 뉴스를 검색해서 반영해줘.`;
+  };
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(buildPrompt());
+      setCopied(true);
+      setTimeout(()=>setCopied(false), 2500);
+    } catch {
+      // 클립보드 권한 실패 시 textarea 폴백
+      const ta = document.createElement('textarea');
+      ta.value = buildPrompt();
+      document.body.appendChild(ta);
+      ta.select(); document.execCommand('copy');
+      document.body.removeChild(ta);
+      setCopied(true);
+      setTimeout(()=>setCopied(false), 2500);
+    }
+  };
+  return (
+    <div style={{margin:'0 12px 8px'}}>
+      <button onClick={copy} style={{width:'100%',padding:'13px',borderRadius:12,border:'1px solid var(--gold-bd)',background:copied?'var(--green-bg)':'var(--gold-bg)',color:copied?'var(--green)':'var(--gold)',fontSize:13,fontWeight:700,cursor:'pointer',fontFamily:'inherit'}}>
+        {copied ? '✅ 복사됨 — Claude 채팅창에 붙여넣으세요' : '📋 Claude 정밀분석 프롬프트 복사'}
+      </button>
+      <div style={{fontSize:9,color:'var(--dim)',marginTop:5,lineHeight:1.5,textAlign:'center'}}>
+        구루 10인 정성분석·최신 뉴스 반영은 자동화가 불가능합니다.<br/>버튼을 눌러 복사한 뒤 Claude에 붙여넣으면 즉시 정밀분석을 받을 수 있습니다.
+      </div>
+    </div>
+  );
+}
 
 function FinChart({ hist }) {
   if (!hist) return (
@@ -54,7 +106,7 @@ function FinChart({ hist }) {
 }
 
 export default function StockDetail({ sym, prices, macro, macroValues, onBack }) {
-  const s = STOCK_UNIVERSE[sym];
+  const s = getUniverseStock(sym);
   if (!s) return null;
   const treasury = macro?.treasury_10y || 4.42;
   const p = prices[sym];
@@ -78,13 +130,13 @@ export default function StockDetail({ sym, prices, macro, macroValues, onBack })
         <div>
           <div style={{fontSize:11,color:'var(--dim)',cursor:'pointer',marginBottom:4}} onClick={onBack}>← 뒤로</div>
           <div style={{display:'flex',gap:8,alignItems:'center'}}>
-            <span className="mono" style={{fontSize:22,fontWeight:700,color:'#fff'}}>{sym}</span>
+            <span className="mono" style={{fontSize:22,fontWeight:700,color:'var(--strong)'}}>{sym}</span>
             <SigBadge s={comp.signal}/>
           </div>
-          <div style={{fontSize:11,color:'var(--dim2)',marginTop:1}}>{s.name} · {s.sector}</div>
+          <div style={{fontSize:11,color:'var(--dim2)',marginTop:1}}>{p?.name || s.name} · {p?.sector || s.sector}{s.lite && ' · 유니버스 종목(가격 지표만)'}</div>
         </div>
         <div style={{textAlign:'right'}}>
-          <div className="mono" style={{fontSize:24,fontWeight:700,color:'#fff'}}>{cur?`$${fmt(cur)}`:'—'}</div>
+          <div className="mono" style={{fontSize:24,fontWeight:700,color:'var(--strong)'}}>{cur?`$${fmt(cur)}`:'—'}</div>
           {p?.change!=null&&<div className={`mono ${clr(p.change)}`} style={{fontSize:11,marginTop:1}}>{p.change>0?'▲':'▼'}{Math.abs(p.change).toFixed(2)}%</div>}
         </div>
       </div>
@@ -193,7 +245,7 @@ export default function StockDetail({ sym, prices, macro, macroValues, onBack })
         {holders.length>0 ? holders.map((h,i)=>(
           <div key={i} style={{marginBottom:i<holders.length-1?8:0,paddingBottom:i<holders.length-1?8:0,borderBottom:i<holders.length-1?'1px solid var(--line)':'none'}}>
             <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
-              <span style={{fontSize:12,fontWeight:700,color:'#fff'}}>{h.guru}</span>
+              <span style={{fontSize:12,fontWeight:700,color:'var(--strong)'}}>{h.guru}</span>
               <span style={{fontSize:9,padding:'1px 7px',borderRadius:10,background:h.action==='NEW'?'var(--green-bg)':'var(--gold-bg)',border:`1px solid ${h.action==='NEW'?'var(--green-bd)':'var(--gold-bd)'}`,color:h.action==='NEW'?'var(--green)':'var(--gold)'}}>{h.action==='NEW'?'신규':h.action==='ADD'?'추가':'보유'}</span>
             </div>
             <div style={{fontSize:10,color:'var(--dim2)',marginTop:3}}>{h.note}</div>
@@ -208,6 +260,10 @@ export default function StockDetail({ sym, prices, macro, macroValues, onBack })
           <span style={{fontSize:11,color:'var(--dim2)'}}>{s.guru_note}</span>
         </div>
       )}
+
+      {/* Claude 정밀분석 프롬프트 복사 */}
+      <SectionTitle>정밀분석</SectionTitle>
+      <AnalysisPromptButton sym={sym} s={s} p={p}/>
     </div>
   );
 }

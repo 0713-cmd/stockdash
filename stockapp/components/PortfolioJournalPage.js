@@ -36,7 +36,7 @@ function TradesTab({ prices, trades, setTrades }) {
           <div style={{marginTop:10}}>
             {stats.positions.map((pos,i)=>(
               <div key={i} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'6px 0',borderBottom:i<stats.positions.length-1?'1px solid var(--line)':'none'}}>
-                <div><span className="mono" style={{fontWeight:700,fontSize:12,color:'#fff'}}>{pos.sym}</span><span style={{fontSize:10,color:'var(--dim)',marginLeft:6}}>{pos.qty}주 @ ${fmt(pos.avg_cost)}</span></div>
+                <div><span className="mono" style={{fontWeight:700,fontSize:12,color:'var(--strong)'}}>{pos.sym}</span><span style={{fontSize:10,color:'var(--dim)',marginLeft:6}}>{pos.qty}주 @ ${fmt(pos.avg_cost)}</span></div>
                 <div style={{textAlign:'right'}}>
                   <span className={`mono ${pos.pnl_pct>=0?'c-green':'c-red'}`} style={{fontSize:12,fontWeight:700}}>{pos.pnl_pct!=null?`${pos.pnl_pct>=0?'+':''}${fmt(pos.pnl_pct)}%`:'—'}</span>
                   {pos.current_price&&<div style={{fontSize:10,color:'var(--dim)',marginTop:1}}>${fmt(pos.current_price)}</div>}
@@ -64,7 +64,7 @@ function TradesTab({ prices, trades, setTrades }) {
             <div key={t.id||i} style={{margin:'0 12px 5px',padding:'10px 14px',background:'var(--bg2)',borderRadius:12,border:'1px solid var(--line)'}}>
               <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:3}}>
                 <div style={{display:'flex',gap:6,alignItems:'center'}}>
-                  <span className="mono" style={{fontWeight:700,fontSize:13,color:'#fff'}}>{t.sym}</span>
+                  <span className="mono" style={{fontWeight:700,fontSize:13,color:'var(--strong)'}}>{t.sym}</span>
                   <span style={{fontSize:10,padding:'1px 6px',borderRadius:10,background:t.action==='매수'?'var(--green-bg)':'var(--red-bg)',border:`1px solid ${t.action==='매수'?'var(--green-bd)':'var(--red-bd)'}`,color:t.action==='매수'?'var(--green)':'var(--red)'}}>{t.action}</span>
                 </div>
                 <div style={{display:'flex',gap:8,alignItems:'center'}}>
@@ -133,7 +133,7 @@ function JournalTab({ prices, journal, setJournal }) {
         <div key={e.id||i} style={{margin:'0 12px 6px',padding:'12px 14px',background:'var(--bg2)',borderRadius:12,border:'1px solid var(--line)'}}>
           <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:6}}>
             <div style={{display:'flex',gap:6,alignItems:'center'}}>
-              {e.sym&&<span className="mono" style={{fontWeight:700,fontSize:13,color:'#fff'}}>{e.sym}</span>}
+              {e.sym&&<span className="mono" style={{fontWeight:700,fontSize:13,color:'var(--strong)'}}>{e.sym}</span>}
               {e.price&&<span style={{fontSize:10,color:'var(--dim2)'}}>${e.price}</span>}
             </div>
             <div style={{display:'flex',gap:8,alignItems:'center'}}>
@@ -159,7 +159,7 @@ export default function PortfolioJournalPage({ prices, trades, setTrades, journa
   const [seg, setSeg] = useState('trades');
   return (
     <div style={{paddingBottom:80}}>
-      <div style={{padding:'14px 16px 8px',fontSize:20,fontWeight:700,color:'#fff'}}>💼 포트폴리오 · 일지</div>
+      <div style={{padding:'14px 16px 8px',fontSize:20,fontWeight:700,color:'var(--strong)'}}>💼 포트폴리오 · 일지</div>
       <Segmented value={seg} onChange={setSeg} options={[['trades','💼 매매기록'],['journal','📔 투자일지']]}/>
       {seg==='trades' && <TradesTab prices={prices} trades={trades} setTrades={setTrades}/>}
       {seg==='journal' && <JournalTab prices={prices} journal={journal} setJournal={setJournal}/>}
