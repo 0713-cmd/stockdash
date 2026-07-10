@@ -3,6 +3,7 @@
 // 매분기 업데이트: 구루 포지션, 재무 기초, 기대값
 // ═══════════════════════════════════════════════════
 import { universeMeta } from './universe';
+import FUNDAMENTALS from './fundamentals_cache.json';
 
 export const STOCK_UNIVERSE = {
   // ── 보유 종목 ────────────────────────────────────
@@ -1311,8 +1312,24 @@ export const METHOD_WEIGHTS = {
 // 라이트 종목은 fair_value/piotroski 등 재무 원본이 없으므로
 // null로 두고, 가격 기반 지표(PE/PEG/모멘텀/종합점수)만 계산된다.
 export function getUniverseStock(symbol) {
+  const fund = FUNDAMENTALS[symbol] || {};
   const curated = STOCK_UNIVERSE[symbol];
-  if (curated) return { ...curated, symbol, lite: false };
+  if (curated) {
+    // 큐레이션 종목: 자체 데이터 우선, 애널리스트 목표가 등 캐시 필드만 보충
+    return {
+      ...curated, symbol, lite: false,
+      target_mean: fund.target_mean ?? null,
+      target_high: fund.target_high ?? null,
+      target_low: fund.target_low ?? null,
+      num_analysts: fund.num_analysts ?? null,
+      recommendation: fund.recommendation ?? null,
+      peg_yahoo: fund.peg_yahoo ?? null,
+      eps_growth_yoy: fund.eps_growth_yoy ?? null,
+      debt_to_equity: fund.debt_to_equity ?? null,
+      current_ratio: fund.current_ratio ?? null,
+      roa: fund.roa ?? null,
+    };
+  }
 
   const meta = universeMeta(symbol);
   return {
@@ -1330,11 +1347,25 @@ export function getUniverseStock(symbol) {
     piotroski: null, beneish_m: null, altman_z: null,
     roic: null, wacc: null,
     mom_12_1: null, erv_score: null,
-    rev_growth_yoy: null, rev_growth_accel: null,
-    gross_margin: null, gm_trend: null,
+    rev_growth_accel: null, gm_trend: null,
     rule_of_40: null, tam_penetration: null,
     guru_cost: null, guru_cost_type: null, guru_note: null,
     segments: [], key_risk: null, key_oppty: null,
     pe_hist_avg_5y: null, pe_hist_min_5y: null, pe_hist_max_5y: null,
+    // 재무 캐시 병합 (Yahoo quoteSummary 공시 기반, build_fundamentals.mjs로 갱신)
+    rev_growth_yoy: fund.rev_growth_yoy ?? null,
+    eps_growth_yoy: fund.eps_growth_yoy ?? null,
+    gross_margin: fund.gross_margin ?? null,
+    op_margin: fund.op_margin ?? null,
+    roa: fund.roa ?? null,
+    roe: fund.roe ?? null,
+    current_ratio: fund.current_ratio ?? null,
+    debt_to_equity: fund.debt_to_equity ?? null,
+    target_mean: fund.target_mean ?? null,
+    target_high: fund.target_high ?? null,
+    target_low: fund.target_low ?? null,
+    num_analysts: fund.num_analysts ?? null,
+    recommendation: fund.recommendation ?? null,
+    peg_yahoo: fund.peg_yahoo ?? null,
   };
 }

@@ -11,6 +11,42 @@ import { ScoreBreakdown } from './ScoreBits';
 import { calcComprehensiveScore } from '../lib/calculations';
 import { guruHoldersOf, macroSensitivity } from './stockUtils';
 
+// ── 한 줄 결론 박스 (매수 판단을 한눈에) ──
+function VerdictBox({ comp, comprehensive, cur, s, up, pos, guruDiff }) {
+  const sig = comp.signal;
+  const conf = {
+    BUY:    { icon:'🟢', head:'지금 매수를 검토할 만합니다', bg:'var(--green-bg)', bd:'var(--green-bd)', col:'var(--green)' },
+    HOLD:   { icon:'🟡', head:'보유 유지 — 신규 진입은 신중히', bg:'var(--gold-bg)', bd:'var(--gold-bd)', col:'var(--gold)' },
+    NEUTRAL:{ icon:'🟡', head:'중립 — 뚜렷한 우위 없음', bg:'var(--gold-bg)', bd:'var(--gold-bd)', col:'var(--gold)' },
+    WAIT:   { icon:'🔴', head:'지금은 대기 — 진입 조건 미충족', bg:'var(--red-bg)', bd:'var(--red-bd)', col:'var(--red)' },
+    DANGER: { icon:'⛔', head:'위험 신호 — 투자 재검토 필요', bg:'var(--red-bg)', bd:'var(--red-bd)', col:'var(--red)' },
+    UNKNOWN:{ icon:'⏳', head:'가격 로딩 후 판단 가능', bg:'var(--bg3)', bd:'var(--line2)', col:'var(--dim2)' },
+  }[sig] || {};
+
+  const reasons = [];
+  if (up != null && up > 15 && up <= 200) reasons.push(`저평가(+${up.toFixed(0)}%)`);
+  else if (up != null && up < -15) reasons.push(`고평가(${up.toFixed(0)}%)`);
+  if (s.piotroski >= 7) reasons.push(`품질우수(F${s.piotroski}/9)`);
+  else if (s.piotroski != null && s.piotroski < 4) reasons.push(`품질주의(F${s.piotroski}/9)`);
+  if (guruDiff != null && guruDiff > 3) reasons.push('구루 매수가보다 저렴');
+  else if (guruDiff != null && guruDiff < -15) reasons.push(`구루보다 ${Math.abs(guruDiff).toFixed(0)}% 비쌈`);
+  if (comprehensive?.grade) reasons.push(`종합 ${comprehensive.score}점 ${comprehensive.grade}`);
+  if (s.beneish_m != null && s.beneish_m > -1.78) reasons.push('⛔ 회계조작 의심');
+
+  return (
+    <div style={{margin:'6px 12px',padding:'14px 16px',background:conf.bg,border:`2px solid ${conf.bd}`,borderRadius:14}}>
+      <div style={{fontSize:15,fontWeight:700,color:conf.col,marginBottom:6}}>{conf.icon} {conf.head}</div>
+      {reasons.length>0&&<div style={{fontSize:11,color:'var(--text)',lineHeight:1.7,marginBottom:sig==='BUY'&&pos>0?6:0}}>이유: {reasons.join(' · ')}</div>}
+      {sig==='BUY'&&cur&&(
+        <div style={{fontSize:11,color:'var(--text)',lineHeight:1.7}}>
+          권고: 자산의 <b style={{color:conf.col}}>{pos>0?`${pos}%`:'소액'}</b> · 손절 <b style={{color:'var(--red)'}}>${fmt(cur*0.8)}</b> (-20%)
+          {s.fair_value&&<> · 목표가 <b style={{color:'var(--gold)'}}>${fmt(s.fair_value,0)}</b></>}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // Claude 정밀분석 프롬프트 복사 버튼
 function AnalysisPromptButton({ sym, s, p }) {
   const [copied, setCopied] = useState(false);
@@ -26,7 +62,7 @@ PEG: ${peg}
 52주 범위: $${p?.low52 ?? '?'}~$${p?.high52 ?? '?'}
 시가총액: ${p?.mktCap ? fmtK(p.mktCap) : 'N/A'}
 섹터: ${p?.sector || s.sector || 'N/A'}
-애널리스트 목표가: 평균 $${p?.targetMean ?? 'N/A'} (${p?.numAnalysts ?? '?'}명, 등급 ${p?.recommendation ?? 'N/A'})
+애널리스트 목표가: 평균 $${p?.targetMean ?? s.target_mean ?? 'N/A'} (${p?.numAnalysts ?? s.num_analysts ?? '?'}명, 등급 ${p?.recommendation ?? s.recommendation ?? 'N/A'})
 
 역산DCF 기대값(내 계산): ${s.fair_value ? `$${s.fair_value} (범위 $${s.fair_low}~$${s.fair_high})` : '미산정'}
 Piotroski F-Score: ${s.piotroski ?? 'N/A'}/9
@@ -185,6 +221,7 @@ export default function StockDetail({ sym, prices, macro, macroValues, onBack })
   const holders = guruHoldersOf(sym);
   const sens = macroValues ? macroSensitivity(s, macroValues) : [];
   const comprehensive = calcComprehensiveScore(s, p);
+  const [showBreakdown, setShowBreakdown] = useState(false);
 
   return (
     <div style={{paddingBottom:80}}>
@@ -205,23 +242,21 @@ export default function StockDetail({ sym, prices, macro, macroValues, onBack })
         </div>
       </div>
 
-      {/* ★ 종합점수 브레이크다운 — 지표별 현재값·기준·획득점수 전부 공개 */}
-      <ScoreBreakdown comp={comprehensive}/>
+      {/* ★ 한 줄 결론 — 최상단에서 바로 판단 */}
+      {s.type!=='locked'
+        ? <VerdictBox comp={comp} comprehensive={comprehensive} cur={cur} s={s} up={up} pos={pos}
+            guruDiff={s.guru_cost&&cur ? (s.guru_cost-cur)/s.guru_cost*100 : null}/>
+        : <div style={{margin:'6px 12px',padding:'12px 14px',background:'var(--bg3)',border:'1px solid var(--line2)',borderRadius:14,fontSize:12,color:'var(--dim2)'}}>🔒 {s.locked_note}</div>
+      }
 
-      {/* 신호 + 매수이유 요약 */}
-      <div style={{margin:'6px 12px',padding:'12px 14px',background:sigBg(comp.signal),border:`1px solid ${sigBd(comp.signal)}`,borderRadius:14}}>
-        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:6}}>
-          <SigBadge s={comp.signal}/>
-          <span style={{fontSize:10,color:'var(--dim)'}}>MARS-V 전략점수 {comp.score}</span>
+      {/* 종합점수 브레이크다운 — 접어두고 "더 자세히 보기" */}
+      <div style={{margin:'0 12px 6px'}}>
+        <div onClick={()=>setShowBreakdown(v=>!v)} style={{padding:'10px 14px',background:'var(--bg2)',border:'1px solid var(--line)',borderRadius:showBreakdown?'12px 12px 0 0':'12px',cursor:'pointer',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+          <span style={{fontSize:12,fontWeight:700,color:'var(--text)'}}>📊 점수 산정 근거 더 자세히 보기 (지표별 현재값·기준·점수)</span>
+          <span style={{fontSize:11,color:'var(--gold)'}}>{showBreakdown?'접기 ▲':'펼치기 ▼'}</span>
         </div>
-        {s.type!=='locked'&&cur&&(
-          <div style={{fontSize:12,color:'var(--text)',lineHeight:1.8}}>
-            {s.fair_value&&<>현재가 <b>${fmt(cur)}</b> → 목표가 <b style={{color:'var(--gold)'}}>${fmt(s.fair_value,0)}</b> ({pct(up)})<br/></>}
-            {pos>0&&<>권고비중 <b style={{color:'var(--gold)'}}>{pos}%</b> · 손절 <b style={{color:'var(--red)'}}>${fmt(cur*.8)}</b><br/></>}
-          </div>
-        )}
-        {s.type==='locked'&&<div style={{fontSize:11,color:'var(--dim2)'}}>🔒 {s.locked_note}</div>}
       </div>
+      {showBreakdown&&<ScoreBreakdown comp={comprehensive}/>}
 
       {/* 투자 논지 요약 */}
       {(s.key_oppty||s.key_risk)&&(

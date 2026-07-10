@@ -98,7 +98,16 @@ function JournalTab({ prices, journal, setJournal }) {
     if (stock && cur) {
       const comp = calcCompositeSignal(stock, cur, 4.42);
       const gd = stock.guru_cost&&cur ? ((stock.guru_cost-cur)/stock.guru_cost*100).toFixed(1) : null;
-      analysis = {signal:comp.signal, ok:comp.signal==='BUY', score:comp.score, mom:stock.mom_12_1, momOk:(stock.mom_12_1||0)>5, guru:gd?(parseFloat(gd)>0?`구루보다 ${gd}% 저렴`:`구루보다 ${Math.abs(gd)}% 비쌈`):'구루 데이터 없음', risk:stock.key_risk?.slice(0,60)||'없음'};
+      const sigOk = comp.signal==='BUY';
+      const momOk = (stock.mom_12_1||0)>5;
+      const guruOk = gd!=null ? parseFloat(gd)>0 : null; // null=판정불가
+      // 규칙 준수 판정: 3개 조건 중 몇 개 충족했는지
+      const checks = [sigOk, momOk, ...(guruOk!=null?[guruOk]:[])];
+      const okCnt = checks.filter(Boolean).length;
+      const compliance = okCnt===checks.length ? '✅ 규칙 준수 진입'
+        : okCnt>=checks.length-1 ? '🟡 부분 준수 진입'
+        : '🔴 규칙 미준수 진입 — 근거 재점검 필요';
+      analysis = {signal:comp.signal, ok:sigOk, score:comp.score, mom:stock.mom_12_1, momOk, guru:gd?(parseFloat(gd)>0?`구루보다 ${gd}% 저렴`:`구루보다 ${Math.abs(gd)}% 비쌈`):'구루 데이터 없음', risk:stock.key_risk?.slice(0,60)||'없음', compliance};
     }
     const entry = {sym,price:form.price,reason:form.reason,expected:form.expected,date:new Date().toLocaleDateString('ko-KR'),id:Date.now(),analysis};
     setJournal(prev=>[entry,...prev]);
@@ -122,6 +131,7 @@ function JournalTab({ prices, journal, setJournal }) {
       {lastAnalysis&&(
         <div style={{margin:'0 12px 8px',padding:'12px 14px',background:'var(--gold-bg)',border:'1px solid var(--gold-bd)',borderRadius:14}}>
           <div style={{fontSize:11,fontWeight:700,color:'var(--gold)',marginBottom:8}}>📊 진입 시점 자동 분석</div>
+          {lastAnalysis.compliance&&<div style={{fontSize:13,fontWeight:700,marginBottom:8,color:lastAnalysis.compliance.startsWith('✅')?'var(--green)':lastAnalysis.compliance.startsWith('🟡')?'var(--gold)':'var(--red)'}}>{lastAnalysis.compliance}</div>}
           <div style={{fontSize:11,color:'var(--text)',lineHeight:1.9}}>
             <div>신호: <b style={{color:sigCol(lastAnalysis.signal)}}>{sigIcon(lastAnalysis.signal)} {lastAnalysis.signal} {lastAnalysis.ok?'✅ 확인':'⚠️ BUY 아님'}</b></div>
             <div>종합점수: <b style={{color:'var(--gold)'}}>{lastAnalysis.score}</b></div>
@@ -148,6 +158,7 @@ function JournalTab({ prices, journal, setJournal }) {
           {e.expected&&<div style={{fontSize:10,color:'var(--gold)',marginBottom:4}}>기대: {e.expected}</div>}
           {e.analysis&&(
             <div style={{marginTop:4,padding:'7px 10px',background:'var(--bg3)',borderRadius:8,fontSize:10,color:'var(--dim2)',lineHeight:1.6}}>
+              {e.analysis.compliance&&<div style={{fontWeight:700,marginBottom:2,color:e.analysis.compliance.startsWith('✅')?'var(--green)':e.analysis.compliance.startsWith('🟡')?'var(--gold)':'var(--red)'}}>{e.analysis.compliance}</div>}
               신호 <span style={{color:sigCol(e.analysis.signal)}}>{e.analysis.signal}</span> · 모멘텀 <span style={{color:e.analysis.momOk?'var(--green)':'var(--red)'}}>{e.analysis.momOk?'충족':'미달'}</span> · {e.analysis.guru}
             </div>
           )}

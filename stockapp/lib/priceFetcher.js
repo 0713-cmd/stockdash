@@ -85,6 +85,11 @@ async function chartFetch(sym) {
 
 function round(n, d = 2) { return n == null ? null : +Number(n).toFixed(d); }
 
+// 데이터 공급자 섹터 오분류 수정 테이블 (실증된 것만 추가)
+const SECTOR_OVERRIDE = {
+  IREN: '기술', // Yahoo가 Financial Services로 오분류 — 실제는 AI컴퓨팅/BTC채굴
+};
+
 function parse(q) {
   if (!q?.regularMarketPrice) return null;
   return {
@@ -112,7 +117,7 @@ function parse(q) {
       return null;
     })(),
     beta: round(q.beta, 2),
-    sector: q.sector ?? null,
+    sector: SECTOR_OVERRIDE[q.symbol] ?? q.sector ?? null,
     name: q.shortName ?? null,
     currency: q.currency ?? 'USD',
     fiftyDayAvg: round(q.fiftyDayAverage),

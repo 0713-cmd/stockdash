@@ -58,6 +58,7 @@ export default function HomePage({ prices, loading, macro, openStock, openMacro,
 
   const [screen, setScreen] = useState(null);
   const [screenErr, setScreenErr] = useState(null);
+  const [showLowCov, setShowLowCov] = useState(false);
   useEffect(() => {
     let alive = true;
     fetch('/api/screen').then(r=>r.json()).then(d=>{
@@ -137,14 +138,17 @@ export default function HomePage({ prices, loading, macro, openStock, openMacro,
               right={<span className="mono" style={{fontSize:12,fontWeight:700,color:gradeCol(s.comprehensive.grade)}}>{s.comprehensive.score}<span style={{fontSize:8,marginLeft:1}}>{s.comprehensive.grade}</span></span>}/>
           )}/>
 
-        {/* 컬럼 2: 종합점수 TOP30 */}
-        <Column icon="🏆" title="종합점수 TOP30" sub={`유니버스 ${screen?.universe_size||163}종목 · 5개 영역 100점`} borderCol="var(--gold-bd)"
+        {/* 컬럼 2: 종합점수 TOP30 (신뢰도 확보 종목만) */}
+        <Column icon="🏆" title="종합점수 TOP30" sub={`데이터 커버리지 70%+ 종목만 · 5개 영역 100점`} borderCol="var(--gold-bd)"
           items={screen?.top30Comprehensive}
           renderRow={(s,i,last)=>(
             <ColRow key={s.symbol} sym={`${i+1}. ${s.symbol}`} name={s.name} price={s.price} change={s.change} last={last}
               highlight={interSet.has(s.symbol)}
               onClick={()=>openStock(s.symbol)}
-              right={<span className="mono" style={{fontSize:12,fontWeight:700,color:gradeCol(s.comprehensive.grade)}}>{s.comprehensive.score}<span style={{fontSize:8,marginLeft:1}}>{s.comprehensive.grade}</span></span>}/>
+              right={<span style={{display:'inline-flex',alignItems:'center',gap:4}}>
+                <span style={{width:8,height:8,borderRadius:'50%',background:sigCol(s.marsV?.signal||'UNKNOWN'),display:'inline-block'}}/>
+                <span className="mono" style={{fontSize:12,fontWeight:700,color:gradeCol(s.comprehensive.grade)}}>{s.comprehensive.score}<span style={{fontSize:8,marginLeft:1}}>{s.comprehensive.grade}</span></span>
+              </span>}/>
           )}/>
 
         {/* 컬럼 3: MARS-V TOP30 */}
@@ -171,7 +175,26 @@ export default function HomePage({ prices, loading, macro, openStock, openMacro,
       {interSet.size>0&&(
         <div style={{margin:'8px 12px 0',fontSize:10,color:'var(--dim2)'}}>
           <span style={{display:'inline-block',width:10,height:10,background:'var(--gold-bg)',border:'1px solid var(--gold-bd)',borderRadius:3,marginRight:5,verticalAlign:'-1px'}}/>
-          금색 배경 = 2개 이상 체계에서 동시 상위권 (이중 검증 · 신뢰도 높음)
+          금색 배경 = 2개 이상 체계에서 동시 상위권 (이중 검증 · 신뢰도 높음) · 점 색 = MARS-V 신호(🟢매수 🟡보유 🔴대기)
+        </div>
+      )}
+
+      {/* 데이터 수집 중 종목 (커버리지 70% 미만 — 접어두기) */}
+      {screen?.lowCoverage?.length>0&&(
+        <div style={{margin:'8px 12px 0'}}>
+          <div onClick={()=>setShowLowCov(v=>!v)} style={{padding:'9px 14px',background:'var(--bg2)',border:'1px solid var(--line)',borderRadius:10,cursor:'pointer',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+            <span style={{fontSize:11,color:'var(--dim2)'}}>📥 데이터 수집 중 종목 {screen.lowCoverage.length}개 (커버리지 70% 미만 — 랭킹 제외)</span>
+            <span style={{fontSize:10,color:'var(--dim)'}}>{showLowCov?'접기 ▲':'보기 ▼'}</span>
+          </div>
+          {showLowCov&&(
+            <div style={{background:'var(--bg2)',border:'1px solid var(--line)',borderTop:'none',borderRadius:'0 0 10px 10px',display:'flex',flexWrap:'wrap',gap:6,padding:'10px 14px'}}>
+              {screen.lowCoverage.map(s=>(
+                <span key={s.symbol} onClick={()=>openStock(s.symbol)} className="mono" style={{fontSize:10,padding:'3px 8px',background:'var(--bg3)',border:'1px solid var(--line2)',borderRadius:6,color:'var(--dim2)',cursor:'pointer'}}>
+                  {s.symbol} <span style={{color:'var(--dim)'}}>{s.comprehensive.coverage}%</span>
+                </span>
+              ))}
+            </div>
+          )}
         </div>
       )}
 

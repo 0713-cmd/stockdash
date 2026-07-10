@@ -354,42 +354,78 @@ export const COMPREHENSIVE_CATEGORIES = [
   { key: 'momentum', label: '모멘텀', max: 10, desc: '주가 추세가 살아있는가' },
 ];
 
+// 섹터별 PE 벤치마크 (성장주 이중페널티 제거 — 섹터 상대 채점)
+const SECTOR_PE_BENCH = {
+  // 한글 (자체 큐레이션 세분류)
+  '기술': 32, 'AI 반도체': 34, 'AI·클라우드': 32, '클라우드·AI': 32, 'AI 소프트웨어': 34,
+  '사이버보안 AI': 34, 'AI 서버 인프라': 28, 'AI인프라(전력·냉각)': 30, 'AI 인프라(전력·냉각)': 30,
+  'AI 광고·모바일': 30, 'AI클라우드·BTC채굴': 25,
+  'AI 네트워크 인프라': 32, '클라우드 DB': 32, '클라우드 모니터링': 32, '클라우드·이커머스': 28,
+  '클라우드·DB': 32, 'HBM 메모리': 20, '소비자 기술': 28, 'EV·로보틱스': 40,
+  '커뮤니케이션': 25, '스트리밍·미디어': 30, '소비순환재': 24, '이커머스 플랫폼': 30,
+  '이커머스·핀테크': 30, '온라인 여행': 22, '필수소비재': 22, '에너지드링크·소비재': 25,
+  '헬스케어': 20, '헬스케어·진단': 30, '금융': 15, '크립토 인프라': 25,
+  '에너지': 14, '소재': 18, '산업재': 22, '유틸리티': 18,
+  // 영문 (Yahoo 원본 섹터명)
+  'Technology': 32, 'Communication Services': 25, 'Consumer Cyclical': 24,
+  'Consumer Defensive': 22, 'Healthcare': 20, 'Financial Services': 15,
+  'Industrials': 22, 'Energy': 14, 'Basic Materials': 18, 'Utilities': 18, 'Real Estate': 16,
+};
+const peBench = sector => SECTOR_PE_BENCH[sector] ?? 24;
+
 export function calcComprehensiveScore(stock, priceData) {
   const p = priceData || {};
   const breakdown = { value: 0, growth: 0, profitability: 0, health: 0, momentum: 0 };
   const items = [];
-  let maxPossible = 0;
 
   const add = (cat, label, curDisp, stdDisp, pts, max) => {
     breakdown[cat] += pts;
-    maxPossible += max;
     items.push({ cat, label, cur: curDisp, std: stdDisp, pts, max });
   };
-  const skip = (cat, label) => items.push({ cat, label, cur: '데이터 없음', std: '—', pts: null, max: null });
+  const skip = (cat, label, reason) => items.push({ cat, label, cur: reason || '데이터 없음', std: '—', pts: null, max: null });
+
+  // ── 이상치 가드 (STEP3) ──
+  // epsForward가 trailing EPS의 5배 초과면 분기/연간 혼동 이상치로 간주
+  let epsForward = p.epsForward;
+  const epsAnomalous = epsForward != null && p.eps != null && p.eps > 0 && epsForward > p.eps * 5;
+  if (epsAnomalous) epsForward = null;
 
   // ── 밸류에이션 30점 ──
-  const pe = p.trailingPE ?? (p.price && stock.eps_ttm > 0 ? p.price / stock.eps_ttm : null);
-  if (pe != null && pe > 0) {
-    const pts = pe < 15 ? 10 : pe < 25 ? 7 : pe < 40 ? 4 : pe < 60 ? 2 : 0;
-    add('value', 'PER(주가수익비율)', `${pe.toFixed(1)}x`, '15x↓ 10점 · 25x↓ 7점 · 40x↓ 4점 · 60x↓ 2점', pts, 10);
-  } else skip('value', 'PER(주가수익비율)');
+  // PER: 섹터 벤치마크 상대 채점 (STEP4 — 절대기준 이중페널티 제거)
+  const peRaw = p.trailingPE ?? (p.price && stock.eps_ttm > 0 ? p.price / stock.eps_ttm : null);
+  // 큐레이션 종목은 자체 세분류(예: AI 반도체 34x)가 Yahoo 대분류보다 정확 → 우선 적용
+  const bench = peBench(stock.lite ? (p.sector || stock.sector) : (stock.sector || p.sector));
+  if (peRaw != null && peRaw > 0 && peRaw <= 200) {
+    const r = peRaw / bench;
+    const pts = r < 0.6 ? 10 : r < 0.85 ? 7 : r < 1.1 ? 4 : r < 1.5 ? 2 : 0;
+    add('value', 'PER(섹터 상대)', `${peRaw.toFixed(1)}x / 섹터기준 ${bench}x`, '섹터기준의 60%↓ 10점 · 85%↓ 7점 · 110%↓ 4점 · 150%↓ 2점', pts, 10);
+  } else if (peRaw != null && peRaw > 200) skip('value', 'PER(섹터 상대)', `N/A(이상치 ${peRaw.toFixed(0)}x)`);
+  else if (peRaw != null && peRaw <= 0) skip('value', 'PER(섹터 상대)', 'N/A(적자기업)');
+  else skip('value', 'PER(섹터 상대)');
 
+  // PEG: 자체 계산 → Yahoo pegRatio 폴백
   let peg = null, pegSrc = '';
-  if (pe != null && p.epsForward && p.eps && p.eps > 0 && p.epsForward > p.eps) {
-    const g = (p.epsForward - p.eps) / p.eps * 100;
-    if (g > 1) { peg = pe / g; pegSrc = 'EPS성장 기준'; }
-  } else if (pe != null && stock.rev_growth_yoy > 1) {
-    peg = pe / stock.rev_growth_yoy; pegSrc = '매출성장 기준';
+  if (peRaw != null && peRaw > 0 && peRaw <= 200) {
+    if (epsForward && p.eps > 0 && epsForward > p.eps) {
+      const g = (epsForward - p.eps) / p.eps * 100;
+      if (g > 1) { peg = peRaw / g; pegSrc = 'EPS성장 기준'; }
+    }
+    if (peg == null && stock.eps_growth_yoy > 1) { peg = peRaw / stock.eps_growth_yoy; pegSrc = 'EPS성장(TTM) 기준'; }
+    if (peg == null && stock.rev_growth_yoy > 1) { peg = peRaw / stock.rev_growth_yoy; pegSrc = '매출성장 기준'; }
   }
-  if (peg != null) {
+  if (peg == null && stock.peg_yahoo != null && stock.peg_yahoo > 0) { peg = stock.peg_yahoo; pegSrc = 'Yahoo 공식'; }
+  if (peg != null && peg > 0 && peg < 20) {
     const pts = peg < 1 ? 10 : peg < 2 ? 5 : 0;
     add('value', `PEG(${pegSrc})`, peg.toFixed(2), '1.0↓ 10점 · 2.0↓ 5점 (낮을수록 성장 대비 저렴)', pts, 10);
-  } else skip('value', 'PEG');
+  } else skip('value', 'PEG', epsAnomalous ? 'N/A(데이터 이상 감지)' : undefined);
 
-  if (p.targetMean && p.price) {
-    const up = (p.targetMean - p.price) / p.price * 100;
+  // 애널리스트 목표가: prices → 재무캐시 폴백
+  const target = p.targetMean ?? stock.target_mean;
+  if (target && p.price) {
+    const up = (target - p.price) / p.price * 100;
     const pts = up > 25 ? 10 : up > 15 ? 7 : up > 5 ? 4 : up > 0 ? 2 : 0;
-    add('value', '애널리스트 목표가 괴리', `${up > 0 ? '+' : ''}${up.toFixed(1)}%`, '+25%↑ 10점 · +15%↑ 7점 · +5%↑ 4점', pts, 10);
+    const na = p.numAnalysts ?? stock.num_analysts;
+    add('value', '애널리스트 목표가 괴리', `${up > 0 ? '+' : ''}${up.toFixed(1)}% (${na ?? '?'}명 평균 $${target})`, '+25%↑ 10점 · +15%↑ 7점 · +5%↑ 4점', pts, 10);
   } else skip('value', '애널리스트 목표가 괴리');
 
   // ── 성장 25점 ──
@@ -399,11 +435,13 @@ export function calcComprehensiveScore(stock, priceData) {
     add('growth', '매출성장(YoY)', `${g > 0 ? '+' : ''}${g.toFixed(1)}%`, '+30%↑ 15점 · +15%↑ 10점 · +0%↑ 5점', pts, 15);
   } else skip('growth', '매출성장(YoY)');
 
-  if (p.epsForward != null && p.eps != null && p.eps > 0) {
-    const g = (p.epsForward - p.eps) / p.eps * 100;
-    const pts = g > 30 ? 10 : g > 15 ? 5 : g > 0 ? 2 : 0;
-    add('growth', 'EPS성장(선행)', `${g > 0 ? '+' : ''}${g.toFixed(1)}%`, '+30%↑ 10점 · +15%↑ 5점 · +0%↑ 2점', pts, 10);
-  } else skip('growth', 'EPS성장(선행)');
+  let epsG = null, epsGSrc = '선행 추정';
+  if (epsForward != null && p.eps != null && p.eps > 0) epsG = (epsForward - p.eps) / p.eps * 100;
+  else if (stock.eps_growth_yoy != null) { epsG = stock.eps_growth_yoy; epsGSrc = 'TTM 공시'; }
+  if (epsG != null) {
+    const pts = epsG > 30 ? 10 : epsG > 15 ? 5 : epsG > 0 ? 2 : 0;
+    add('growth', `EPS성장(${epsGSrc})`, `${epsG > 0 ? '+' : ''}${epsG.toFixed(1)}%`, '+30%↑ 10점 · +15%↑ 5점 · +0%↑ 2점', pts, 10);
+  } else skip('growth', 'EPS성장', epsAnomalous ? 'N/A(데이터 이상 감지)' : undefined);
 
   // ── 수익성 20점 ──
   if (stock.gross_margin != null) {
@@ -415,18 +453,31 @@ export function calcComprehensiveScore(stock, priceData) {
   if (stock.roic != null) {
     const pts = stock.roic > 20 ? 10 : stock.roic > 10 ? 5 : 0;
     add('profitability', 'ROIC(투하자본이익률)', `${stock.roic.toFixed(1)}%`, '20%↑ 10점 · 10%↑ 5점', pts, 10);
-  } else skip('profitability', 'ROIC');
+  } else if (stock.roa != null) {
+    // ROIC 미보유 종목은 ROA(총자산이익률)로 근사 — 기준 완화 적용
+    const pts = stock.roa > 15 ? 10 : stock.roa > 7 ? 5 : 0;
+    add('profitability', '자본효율(ROA 근사)', `${stock.roa.toFixed(1)}%`, '15%↑ 10점 · 7%↑ 5점 (ROIC 대용)', pts, 10);
+  } else skip('profitability', 'ROIC/ROA');
 
   // ── 건전성 15점 ──
   if (stock.piotroski != null) {
     const pts = stock.piotroski >= 7 ? 10 : stock.piotroski >= 4 ? 5 : 0;
     add('health', 'Piotroski F-Score', `${stock.piotroski}/9`, '7점↑ 10점 · 4점↑ 5점', pts, 10);
-  } else skip('health', 'Piotroski F-Score');
+  } else if (stock.debt_to_equity != null) {
+    // Piotroski 미산정 종목은 부채비율로 대체 채점
+    const d = stock.debt_to_equity;
+    const pts = d < 50 ? 10 : d < 100 ? 6 : d < 200 ? 3 : 0;
+    add('health', '부채비율(D/E, 대체지표)', `${d.toFixed(0)}%`, '50%↓ 10점 · 100%↓ 6점 · 200%↓ 3점', pts, 10);
+  } else skip('health', 'Piotroski F / 부채비율');
 
   if (stock.altman_z != null) {
     const pts = stock.altman_z > 2.99 ? 5 : stock.altman_z > 1.81 ? 2 : 0;
     add('health', 'Altman Z(부도위험)', `${stock.altman_z}`, '2.99↑ 5점(안전) · 1.81↑ 2점(회색)', pts, 5);
-  } else skip('health', 'Altman Z');
+  } else if (stock.current_ratio != null) {
+    const c = stock.current_ratio;
+    const pts = c > 1.5 ? 5 : c > 1.0 ? 2 : 0;
+    add('health', '유동비율(대체지표)', `${c.toFixed(2)}`, '1.5↑ 5점 · 1.0↑ 2점', pts, 5);
+  } else skip('health', 'Altman Z / 유동비율');
 
   // ── 모멘텀 10점 ──
   if (p.twoHundredDayChgPct != null) {
@@ -439,10 +490,19 @@ export function calcComprehensiveScore(stock, priceData) {
     add('momentum', '가격모멘텀(12-1M)', `${g > 0 ? '+' : ''}${g.toFixed(1)}%`, '+30%↑ 10점 · +15%↑ 7점 · +0%↑ 4점', pts, 10);
   } else skip('momentum', '모멘텀');
 
-  const raw = breakdown.value + breakdown.growth + breakdown.profitability + breakdown.health + breakdown.momentum;
-  const score = maxPossible > 0 ? Math.round(raw / maxPossible * 100) : 0;
-  const coverage = maxPossible;
+  // ── STEP1: 측정 항목만으로 정규화 + 커버리지 페널티 ──
+  const measured = items.filter(i => i.pts !== null);
+  const earnedPoints = measured.reduce((s, i) => s + i.pts, 0);
+  const possiblePoints = measured.reduce((s, i) => s + i.max, 0);
 
+  let normalizedScore = possiblePoints > 0 ? (earnedPoints / possiblePoints) * 100 : 0;
+  const coverage = possiblePoints / 100; // 전항목 만점 합 = 100
+
+  // 데이터 부족 페널티: 신뢰도 낮은 점수가 완비 종목 위에 오지 못하게
+  if (coverage < 0.5) normalizedScore *= 0.70;
+  else if (coverage < 0.7) normalizedScore *= 0.85;
+
+  const score = Math.round(normalizedScore);
   let grade;
   if (score >= 80) grade = 'A+';
   else if (score >= 70) grade = 'A';
@@ -451,7 +511,15 @@ export function calcComprehensiveScore(stock, priceData) {
   else if (score >= 40) grade = 'C';
   else grade = 'D';
 
-  return { score, grade, breakdown, coverage, lowConfidence: coverage < 40, items, raw };
+  // lite(재무 원본 미보유) 종목은 A등급 상한 B+
+  if (stock.lite && grade.startsWith('A')) grade = 'B+';
+
+  return {
+    score, grade, breakdown,
+    coverage: Math.round(coverage * 100),
+    lowConfidence: coverage < 0.5,
+    items, raw: earnedPoints,
+  };
 }
 
 // ── 주간 스크리닝 (3대 체계 동시 실행) ──────────
@@ -474,8 +542,14 @@ export function screenUniverse(stocksWithPrices, treasury10y = 4.42) {
       revGrowth: s.rev_growth_yoy,
     }));
 
+  // 신뢰도 확보(커버리지 70%+) 종목만 메인 랭킹, 미달은 별도 목록
   const top30Comprehensive = [...withScores]
-    .filter(s => !s.comprehensive.lowConfidence || !s.lite)
+    .filter(s => s.comprehensive.coverage >= 70)
+    .sort((a, b) => b.comprehensive.score - a.comprehensive.score)
+    .slice(0, 30);
+
+  const lowCoverage = [...withScores]
+    .filter(s => s.comprehensive.coverage < 70)
     .sort((a, b) => b.comprehensive.score - a.comprehensive.score)
     .slice(0, 30);
 
@@ -489,7 +563,7 @@ export function screenUniverse(stocksWithPrices, treasury10y = 4.42) {
     .sort((a, b) => b.tenBagger - a.tenBagger)
     .slice(0, 30);
 
-  return { top30Comprehensive, top30MarsV, top30TenBagger, screened: withScores.length };
+  return { top30Comprehensive, lowCoverage, top30MarsV, top30TenBagger, screened: withScores.length };
 }
 
 // ── 손절·익절 경보 ──────────────────────────────
