@@ -511,8 +511,9 @@ export function calcComprehensiveScore(stock, priceData) {
   else if (score >= 40) grade = 'C';
   else grade = 'D';
 
-  // lite(재무 원본 미보유) 종목은 A등급 상한 B+
-  if (stock.lite && grade.startsWith('A')) grade = 'B+';
+  // lite 종목 등급 상한: 커버리지 90% 이상이면 데이터가 충분하므로 A 허용,
+  // 미만이면 B+ 상한 (데이터 부족 종목이 최상위권 차지 방지)
+  if (stock.lite && grade.startsWith('A') && coverage < 0.9) grade = 'B+';
 
   return {
     score, grade, breakdown,
