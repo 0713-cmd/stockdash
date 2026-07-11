@@ -249,6 +249,31 @@ export default function StockDetail({ sym, prices, macro, macroValues, onBack })
         : <div style={{margin:'6px 12px',padding:'12px 14px',background:'var(--bg3)',border:'1px solid var(--line2)',borderRadius:14,fontSize:12,color:'var(--dim2)'}}>🔒 {s.locked_note}</div>
       }
 
+      {/* 핵심 4칸 — 현재가/목표가/예상수익/종합점수 */}
+      {(()=>{
+        const tgt = s.fair_value ?? s.target_mean ?? p?.targetMean ?? null;
+        const tgtSrc = s.fair_value ? 'DCF' : tgt ? '애널리스트' : null;
+        let expUp = cur && tgt ? (tgt-cur)/cur*100 : null;
+        if (expUp != null && expUp > 200) expUp = null;
+        const cells = [
+          ['현재가', cur?`$${fmt(cur)}`:'—', 'var(--strong)', p?.change!=null?`${p.change>0?'+':''}${p.change.toFixed(2)}% 오늘`:''],
+          [`목표가${tgtSrc?` (${tgtSrc})`:''}`, tgt?`$${fmt(tgt,0)}`:'—', 'var(--gold)', s.target_mean&&s.fair_value?`애널리스트 $${fmt(s.target_mean,0)}`:''],
+          ['예상수익', expUp!=null?`${expUp>0?'+':''}${expUp.toFixed(1)}%`:'—', expUp>0?'var(--green)':expUp<0?'var(--red)':'var(--dim)', ''],
+          ['종합점수', `${comprehensive.score}점`, comprehensive.grade?.startsWith('A')?'var(--green)':comprehensive.grade?.startsWith('B')?'var(--gold)':'var(--red)', `등급 ${comprehensive.grade} · 커버리지 ${comprehensive.coverage}%`],
+        ];
+        return (
+          <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(140px,1fr))',gap:8,margin:'0 12px 8px'}}>
+            {cells.map(([l,v,col,sub],i)=>(
+              <div key={i} style={{background:'var(--bg2)',border:'1px solid var(--line)',borderRadius:12,padding:'11px 13px'}}>
+                <div style={{fontSize:10,color:'var(--dim)',marginBottom:4}}>{l}</div>
+                <div className="mono" style={{fontSize:19,fontWeight:700,color:col,lineHeight:1.1}}>{v}</div>
+                {sub&&<div style={{fontSize:9,color:'var(--dim2)',marginTop:3}}>{sub}</div>}
+              </div>
+            ))}
+          </div>
+        );
+      })()}
+
       {/* 종합점수 브레이크다운 — 접어두고 "더 자세히 보기" */}
       <div style={{margin:'0 12px 6px'}}>
         <div onClick={()=>setShowBreakdown(v=>!v)} style={{padding:'10px 14px',background:'var(--bg2)',border:'1px solid var(--line)',borderRadius:showBreakdown?'12px 12px 0 0':'12px',cursor:'pointer',display:'flex',justifyContent:'space-between',alignItems:'center'}}>

@@ -527,21 +527,33 @@ export function calcComprehensiveScore(stock, priceData) {
 export function screenUniverse(stocksWithPrices, treasury10y = 4.42) {
   const withScores = stocksWithPrices
     .filter(s => s.priceData?.price)
-    .map(s => ({
-      symbol: s.symbol,
-      name: s.priceData?.name || s.name || s.symbol,
-      sector: s.priceData?.sector || s.sector,
-      lite: s.lite,
-      price: s.priceData.price,
-      change: s.priceData.change,
-      targetMean: s.priceData.targetMean,
-      recommendation: s.priceData.recommendation,
-      comprehensive: calcComprehensiveScore(s, s.priceData),
-      marsV: calcCompositeSignal(s, s.priceData.price, treasury10y),
-      tenBagger: s.rev_growth_yoy != null ? calcTenBaggerScore(s) : null,
-      ruleOf40: s.rule_of_40 ?? (s.gross_margin != null && s.rev_growth_yoy != null ? Math.round(s.gross_margin + s.rev_growth_yoy - 100) : null),
-      revGrowth: s.rev_growth_yoy,
-    }));
+    .map(s => {
+      const price = s.priceData.price;
+      // 목표가 우선순위: 자체 DCF(fair_value) → 애널리스트 평균 (출처 명시)
+      let target = null, targetSrc = null;
+      if (s.fair_value != null) { target = s.fair_value; targetSrc = 'DCF'; }
+      else if (s.priceData.targetMean != null) { target = s.priceData.targetMean; targetSrc = '애널리스트'; }
+      else if (s.target_mean != null) { target = s.target_mean; targetSrc = '애널리스트'; }
+      let upside = target ? +((target - price) / price * 100).toFixed(1) : null;
+      if (upside != null && upside > 200) upside = null; // 분할 등 데이터 이상 가드
+      return {
+        symbol: s.symbol,
+        name: s.priceData?.name || s.name || s.symbol,
+        sector: s.priceData?.sector || s.sector,
+        lite: s.lite,
+        price,
+        change: s.priceData.change,
+        target, targetSrc, upside,
+        targetMean: s.priceData.targetMean ?? s.target_mean ?? null,
+        numAnalysts: s.priceData.numAnalysts ?? s.num_analysts ?? null,
+        recommendation: s.priceData.recommendation ?? s.recommendation ?? null,
+        comprehensive: calcComprehensiveScore(s, s.priceData),
+        marsV: calcCompositeSignal(s, price, treasury10y),
+        tenBagger: s.rev_growth_yoy != null ? calcTenBaggerScore(s) : null,
+        ruleOf40: s.rule_of_40 ?? (s.gross_margin != null && s.rev_growth_yoy != null ? Math.round(s.gross_margin + s.rev_growth_yoy - 100) : null),
+        revGrowth: s.rev_growth_yoy,
+      };
+    });
 
   // 신뢰도 확보(커버리지 70%+) 종목만 메인 랭킹, 미달은 별도 목록
   const top30Comprehensive = [...withScores]
