@@ -14,7 +14,7 @@ export function useHomeData({ prices, macro }) {
   const [screenErr, setScreenErr] = useState(null);
   useEffect(() => {
     let alive = true;
-    fetch('/api/screen').then(r => r.json()).then(d => {
+    import('./screenCache').then(({ getScreen }) => getScreen()).then(d => {
       if (!alive) return;
       if (d.error) setScreenErr(d.error);
       setScreen(d);

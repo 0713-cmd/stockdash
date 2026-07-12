@@ -11,6 +11,71 @@ import { ScoreBreakdown } from './ScoreBits';
 import { calcComprehensiveScore } from '../lib/calculations';
 import { guruHoldersOf, macroSensitivity } from './stockUtils';
 
+// ── vs 섹터 중앙값 비교 (163종목 실측) ──
+function SectorCompare({ s, p, pe }) {
+  const [stats, setStats] = useState(null);
+  useEffect(() => {
+    let alive = true;
+    import('./screenCache').then(({getScreen})=>getScreen()).then(d=>{
+      if (alive && d.sectorStats) setStats(d.sectorStats);
+    }).catch(()=>{});
+    return ()=>{ alive=false; };
+  }, []);
+  const sector = s.lite ? (p?.sector || s.sector) : (s.sector || p?.sector);
+  const st = stats?.[sector];
+  if (!st) return null;
+  const rows = [
+    ['PER', pe, st.pe, 'x', true],
+    ['매출성장', s.rev_growth_yoy, st.growth, '%', false],
+    ['매출총이익률', s.gross_margin, st.gm, '%', false],
+  ].filter(([,mine,med])=>mine!=null&&med!=null);
+  if (rows.length===0) return null;
+  return (
+    <div style={{margin:'0 12px 6px',background:'var(--bg2)',borderRadius:14,border:'1px solid var(--line)',padding:'12px 14px'}}>
+      <div style={{fontSize:10,fontWeight:700,color:'var(--strong)',marginBottom:8}}>vs 동종 섹터 중앙값 <span style={{fontSize:8,color:'var(--dim)',fontWeight:400}}>({sector} · 유니버스 {st.n}개 실측)</span></div>
+      {rows.map(([label,mine,med,unit,lowerBetter],i)=>{
+        const better = lowerBetter ? mine < med : mine > med;
+        return (
+          <div key={i} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'5px 0',borderBottom:i<rows.length-1?'1px solid var(--line)':'none',fontSize:11}}>
+            <span style={{color:'var(--dim2)'}}>{label}</span>
+            <span className="mono">
+              <b style={{color:better?'var(--green)':'var(--red)'}}>{Number(mine).toFixed(1)}{unit}</b>
+              <span style={{color:'var(--dim)',margin:'0 6px'}}>vs 섹터 {Number(med).toFixed(1)}{unit}</span>
+              <span style={{fontSize:9,fontWeight:700,color:better?'var(--green)':'var(--red)'}}>{better?'우위':'열위'}</span>
+            </span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// ── 최근 뉴스 (Finnhub — Vercel 배포 환경에서 표시) ──
+function NewsSection({ sym }) {
+  const [news, setNews] = useState(null);
+  useEffect(() => {
+    let alive = true;
+    fetch(`/api/finnhub?type=news&sym=${sym}`).then(r=>r.json()).then(d=>{
+      if (alive) setNews(d.news || []);
+    }).catch(()=>{ if (alive) setNews([]); });
+    return ()=>{ alive=false; };
+  }, [sym]);
+  if (!news || news.length===0) return null;
+  return (
+    <>
+      <SectionTitle>최근 뉴스 (7일)</SectionTitle>
+      <div style={{margin:'0 12px 6px',background:'var(--bg2)',borderRadius:14,border:'1px solid var(--line)',overflow:'hidden'}}>
+        {news.map((n,i)=>(
+          <a key={i} href={n.url} target="_blank" rel="noreferrer" style={{display:'block',padding:'9px 14px',borderBottom:i<news.length-1?'1px solid var(--line)':'none',textDecoration:'none'}}>
+            <div style={{fontSize:11,color:'var(--text)',lineHeight:1.5}}>{n.headline}</div>
+            <div style={{fontSize:9,color:'var(--dim)',marginTop:2}}>{n.source} · {n.date}</div>
+          </a>
+        ))}
+      </div>
+    </>
+  );
+}
+
 // ── 한 줄 결론 박스 (매수 판단을 한눈에) ──
 function VerdictBox({ comp, comprehensive, cur, s, up, pos, guruDiff }) {
   const sig = comp.signal;
@@ -54,21 +119,28 @@ function AnalysisPromptButton({ sym, s, p }) {
     const today = new Date().toLocaleDateString('ko-KR');
     const peg = p?.trailingPE && p?.epsForward && p?.eps > 0 && p.epsForward > p.eps
       ? (p.trailingPE / ((p.epsForward - p.eps) / p.eps * 100)).toFixed(2) : 'N/A';
-    return `${sym}(${p?.name || s.name || sym}) 정밀분석 요청
+    const up = s.fair_value && p?.price ? ((s.fair_value - p.price)/p.price*100).toFixed(1) : null;
+    return `당신은 7인 투자위원회(IC)를 지휘하는 헤지펀드 CIO입니다. 아래 ${sym}(${p?.name || s.name || sym})에 대해 다음 절차를 순서대로 수행하고, 각 역할이 서로의 주장을 반박하게 하세요. 결론을 미리 정하지 말 것.
 
-현재가: $${p?.price ?? '?'} (${today} 기준)
-PER(TTM): ${p?.trailingPE ?? 'N/A'}x / Forward PER: ${p?.forwardPE ?? 'N/A'}x
-PEG: ${peg}
-52주 범위: $${p?.low52 ?? '?'}~$${p?.high52 ?? '?'}
-시가총액: ${p?.mktCap ? fmtK(p.mktCap) : 'N/A'}
-섹터: ${p?.sector || s.sector || 'N/A'}
-애널리스트 목표가: 평균 $${p?.targetMean ?? s.target_mean ?? 'N/A'} (${p?.numAnalysts ?? s.num_analysts ?? '?'}명, 등급 ${p?.recommendation ?? s.recommendation ?? 'N/A'})
+━━ 스크리닝 통과 데이터 (${today} 기준) ━━
+현재가: $${p?.price ?? '?'} · 52주: $${p?.low52 ?? '?'}~$${p?.high52 ?? '?'}
+PER(TTM): ${p?.trailingPE ?? 'N/A'}x / Forward: ${p?.forwardPE ?? 'N/A'}x / PEG: ${peg}
+시가총액: ${p?.mktCap ? fmtK(p.mktCap) : 'N/A'} · 섹터: ${p?.sector || s.sector || 'N/A'}
+애널리스트 목표가: 평균 $${p?.targetMean ?? s.target_mean ?? 'N/A'} (${p?.numAnalysts ?? s.num_analysts ?? '?'}명, ${p?.recommendation ?? s.recommendation ?? 'N/A'})
+자체 DCF 적정가: ${s.fair_value ? `$${s.fair_value} (${up>0?'+':''}${up}% 여력, 범위 $${s.fair_low}~$${s.fair_high})` : '미산정'}
+Piotroski F: ${s.piotroski ?? 'N/A'}/9 · Beneish M: ${s.beneish_m ?? 'N/A'} · Altman Z: ${s.altman_z ?? 'N/A'}
+ROIC ${s.roic ?? 'N/A'}% / WACC ${s.wacc ?? 'N/A'}% · 매출성장 ${s.rev_growth_yoy ?? 'N/A'}% · GM ${s.gross_margin ?? 'N/A'}%
 
-역산DCF 기대값(내 계산): ${s.fair_value ? `$${s.fair_value} (범위 $${s.fair_low}~$${s.fair_high})` : '미산정'}
-Piotroski F-Score: ${s.piotroski ?? 'N/A'}/9
-Beneish M-Score: ${s.beneish_m ?? 'N/A'}
+━━ IC 절차 (반드시 이 순서·형식) ━━
+① 정량 애널리스트: 위 숫자로 밸류에이션·성장·품질을 냉정히 채점. 역산DCF 3단계(현재 내재 기대치 → 그게 현실적인가 → 재평가).
+② 정성 애널리스트: 해자·경영진·산업 사이클·제품 로드맵·규제. 숫자에 안 잡히는 요인. 최신 뉴스 검색해서 반영.
+③ Bull(긍정론자): 가장 강한 매수 논거 3가지. 상승 시나리오 목표가와 촉매.
+④ Bear(부정론자): 가장 강한 반대 논거 3가지. 하락 시나리오와 손실 트리거. Bull 주장을 직접 반박.
+⑤ 리스크 매니저: 변동성·집중도·매크로 민감도. 이 종목이 틀렸을 때 얼마나 잃나. 적정 포지션 상한·손절가.
+⑥ 수석(당신)의 판결: Bull vs Bear 중 누가 이겼고 왜인지 명시. 확증편향 없이.
+⑦ 최종 결론: 매수/보류/회피 + 확신도(상/중/하) + 권고 비중(%) + 진입가·손절가·목표가. "지금 안 사는 게 낫다"도 유효한 결론.
 
-위 데이터를 기반으로 모부신 역산DCF 3단계 + 투자대가 10인 통합분석 + 퀀트 스코어카드를 수행해줘. 현재 시장 맥락은 최신 뉴스를 검색해서 반영해줘.`;
+논문 수준으로 근거를 대되, 마지막에 3줄 요약(TL;DR)으로 실행 가능하게 끝내세요.`;
   };
   const copy = async () => {
     try {
@@ -89,10 +161,10 @@ Beneish M-Score: ${s.beneish_m ?? 'N/A'}
   return (
     <div style={{margin:'0 12px 8px'}}>
       <button onClick={copy} style={{width:'100%',padding:'13px',borderRadius:12,border:'1px solid var(--gold-bd)',background:copied?'var(--green-bg)':'var(--gold-bg)',color:copied?'var(--green)':'var(--gold)',fontSize:13,fontWeight:700,cursor:'pointer',fontFamily:'inherit'}}>
-        {copied ? '✅ 복사됨 — Claude 채팅창에 붙여넣으세요' : '📋 Claude 정밀분석 프롬프트 복사'}
+        {copied ? '✅ 복사됨 — Claude 채팅창에 붙여넣으세요' : '🏛️ 7인 투자위원회(IC) 심층분석 프롬프트 복사'}
       </button>
       <div style={{fontSize:9,color:'var(--dim)',marginTop:5,lineHeight:1.5,textAlign:'center'}}>
-        구루 10인 정성분석·최신 뉴스 반영은 자동화가 불가능합니다.<br/>버튼을 눌러 복사한 뒤 Claude에 붙여넣으면 즉시 정밀분석을 받을 수 있습니다.
+        정량·정성 애널리스트 + Bull·Bear 논쟁 + 리스크매니저 + 수석판결의 7인 IC 절차.<br/>스크리닝이 넘긴 실데이터를 물고 Claude에 붙여넣으면 논문 수준 양면 검토를 받습니다.
       </div>
     </div>
   );
@@ -130,6 +202,23 @@ function FinTable({ sym }) {
     </div>
   );
 
+  // ── 1년 주가 라인 ──
+  const ps = fin.priceSeries || [];
+  let spark = null;
+  if (ps.length > 3) {
+    const cs = ps.map(x=>x.c);
+    const mn = Math.min(...cs), mx = Math.max(...cs);
+    const rng = mx - mn || 1;
+    const W = 560, H = 60;
+    const pts = cs.map((c,i)=>`${(i/(cs.length-1)*W).toFixed(1)},${(H-4-(c-mn)/rng*(H-8)).toFixed(1)}`).join(' ');
+    const ret1y = ((cs[cs.length-1]-cs[0])/cs[0]*100);
+    spark = { pts, W, H, mn, mx, ret1y, last: cs[cs.length-1] };
+  }
+
+  // ── 리비전 요약 ──
+  const rev = fin.revisions;
+  const revChg = rev?.current != null && rev?.d90 != null && rev.d90 !== 0 ? (rev.current - rev.d90) / Math.abs(rev.d90) * 100 : null;
+
   // 최신이 맨 위
   const annual = [...fin.annual].reverse();
   // 분기: 최신 먼저, 전분기비 + (4분기 전 데이터 있으면) 전년동기비
@@ -145,6 +234,58 @@ function FinTable({ sym }) {
 
   return (
     <div style={{margin:'0 12px 6px',background:'var(--bg2)',borderRadius:14,border:'1px solid var(--line)',overflow:'hidden'}}>
+      {/* 1년 주가 */}
+      {spark&&(
+        <div style={{padding:'12px 14px',borderBottom:'1px solid var(--line)'}}>
+          <div style={{display:'flex',justifyContent:'space-between',alignItems:'baseline',marginBottom:6}}>
+            <span style={{fontSize:11,fontWeight:700,color:'var(--strong)'}}>1년 주가 추이 (주간)</span>
+            <span className="mono" style={{fontSize:12,fontWeight:700,color:spark.ret1y>0?'var(--green)':'var(--red)'}}>1년 {spark.ret1y>0?'+':''}{spark.ret1y.toFixed(1)}%</span>
+          </div>
+          <svg viewBox={`0 0 ${spark.W} ${spark.H}`} style={{width:'100%',height:60,display:'block'}} aria-hidden="true">
+            <polyline points={spark.pts} fill="none" stroke={spark.ret1y>0?'var(--green)':'var(--red)'} strokeWidth="1.8"/>
+          </svg>
+          <div style={{display:'flex',justifyContent:'space-between',fontSize:9,color:'var(--dim)'}}>
+            <span>저점 ${fmt(spark.mn)}</span><span>현재 ${fmt(spark.last)}</span><span>고점 ${fmt(spark.mx)}</span>
+          </div>
+        </div>
+      )}
+
+      {/* 리비전 + 서프라이즈 + 배당 */}
+      <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(220px,1fr))',gap:0,borderBottom:'1px solid var(--line)'}}>
+        <div style={{padding:'10px 14px',borderRight:'1px solid var(--line)'}}>
+          <div style={{fontSize:10,fontWeight:700,color:'var(--strong)',marginBottom:4}}>애널리스트 EPS 추정 변화 <span style={{fontSize:8,color:'var(--dim)',fontWeight:400}}>(당해연도)</span></div>
+          {rev?.current!=null ? (
+            <div style={{fontSize:11,color:'var(--dim2)',lineHeight:1.7}}>
+              90일 전 ${rev.d90 ?? '—'} → 현재 <b className="mono" style={{color:revChg>0?'var(--green)':revChg<0?'var(--red)':'var(--text)'}}>${rev.current}</b>
+              {revChg!=null&&<b style={{color:revChg>0?'var(--green)':'var(--red)'}}> ({revChg>0?'+':''}{revChg.toFixed(1)}%)</b>}<br/>
+              최근 30일 상향 <b style={{color:'var(--green)'}}>{rev.upLast30 ?? 0}</b>건 · 하향 <b style={{color:'var(--red)'}}>{rev.downLast30 ?? 0}</b>건
+              {revChg!=null&&<span style={{color:revChg>2?'var(--green)':revChg<-2?'var(--red)':'var(--dim)'}}> — {revChg>2?'상향 추세 ✅':revChg<-2?'하향 추세 ⚠️':'중립'}</span>}
+            </div>
+          ) : <div style={{fontSize:10,color:'var(--dim)'}}>데이터 없음</div>}
+        </div>
+        <div style={{padding:'10px 14px'}}>
+          <div style={{fontSize:10,fontWeight:700,color:'var(--strong)',marginBottom:4}}>실적 서프라이즈 <span style={{fontSize:8,color:'var(--dim)',fontWeight:400}}>(최근 4분기, 예상 대비)</span></div>
+          {fin.surprises?.length>0 ? (
+            <div style={{display:'flex',gap:5,flexWrap:'wrap'}}>
+              {fin.surprises.map((h,i)=>(
+                <span key={i} className="mono" style={{fontSize:10,fontWeight:700,padding:'2px 7px',borderRadius:6,background:h.surprisePct>0?'var(--green-bg)':'var(--red-bg)',border:`1px solid ${h.surprisePct>0?'var(--green-bd)':'var(--red-bd)'}`,color:h.surprisePct>0?'var(--green)':'var(--red)'}}>
+                  {h.surprisePct>0?'+':''}{h.surprisePct}%
+                </span>
+              ))}
+              <span style={{fontSize:9,color:'var(--dim2)',alignSelf:'center'}}>{fin.surprises.filter(h=>h.surprisePct>0).length}/{fin.surprises.length}분기 상회</span>
+            </div>
+          ) : <div style={{fontSize:10,color:'var(--dim)'}}>데이터 없음</div>}
+          {fin.dividend?.yieldPct!=null&&fin.dividend.yieldPct>0&&(
+            <div style={{fontSize:10,color:'var(--dim2)',marginTop:6}}>
+              배당 <b className="mono" style={{color:'var(--text)'}}>{fin.dividend.yieldPct}%</b>
+              {fin.dividend.rate!=null&&<> (연 ${fin.dividend.rate})</>}
+              {fin.dividend.payoutRatio!=null&&<> · 배당성향 {fin.dividend.payoutRatio}%</>}
+              {fin.dividend.exDate&&<> · 배당락 {fin.dividend.exDate}</>}
+            </div>
+          )}
+        </div>
+      </div>
+
       <div style={{padding:'12px 14px 4px',fontSize:11,fontWeight:700,color:'var(--strong)'}}>연간 실적 — 실제 공시 기준</div>
       <table style={{width:'100%',borderCollapse:'collapse'}}>
         <thead>
@@ -283,6 +424,9 @@ export default function StockDetail({ sym, prices, macro, macroValues, onBack })
       </div>
       {showBreakdown&&<ScoreBreakdown comp={comprehensive}/>}
 
+      {/* vs 섹터 중앙값 (163종목 실측 비교) */}
+      <SectorCompare s={s} p={p} pe={pe}/>
+
       {/* 투자 논지 요약 */}
       {(s.key_oppty||s.key_risk)&&(
         <div style={{margin:'0 12px 6px',padding:'12px 14px',background:'var(--bg2)',borderRadius:14,border:'1px solid var(--line)'}}>
@@ -387,6 +531,9 @@ export default function StockDetail({ sym, prices, macro, macroValues, onBack })
           <span style={{fontSize:11,color:'var(--dim2)'}}>{s.guru_note}</span>
         </div>
       )}
+
+      {/* 최근 뉴스 */}
+      <NewsSection sym={sym}/>
 
       {/* Claude 정밀분석 프롬프트 복사 */}
       <SectionTitle>정밀분석</SectionTitle>

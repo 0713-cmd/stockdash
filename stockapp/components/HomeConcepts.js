@@ -51,68 +51,118 @@ function Loading({ err }) {
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // 시안 A — 클린 테이블 (인베스팅닷컴풍)
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// 4열 컬럼 안의 종목 행 — 2줄 컴팩트 (빈 공간 없음)
+function ARow({ rank, s, right1, right2, onClick, last, highlight }) {
+  return (
+    <div onClick={onClick} style={{padding:'7px 10px',borderBottom:last?'none':'1px solid var(--line)',cursor:'pointer',background:highlight?'var(--gold-bg)':'transparent'}}>
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'baseline',gap:6}}>
+        <span style={{minWidth:0,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>
+          {rank!=null&&<span style={{fontSize:9,color:'var(--dim)',marginRight:4}}>{rank}</span>}
+          <span className="mono" style={{fontWeight:700,fontSize:12,color:'var(--strong)'}}>{s.symbol}</span>
+          {s.locked&&<span style={{fontSize:9}}> 🔒</span>}
+        </span>
+        {right1}
+      </div>
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'baseline',gap:6,marginTop:1}}>
+        <span className="mono" style={{fontSize:10,color:'var(--dim2)',whiteSpace:'nowrap'}}>
+          ${fmt(s.price)}{s.change!=null&&<span className={clr(s.change)}> {s.change>0?'+':''}{s.change.toFixed(1)}%</span>}
+          {s.target!=null&&<span style={{color:'var(--dim)'}}>→${fmt(s.target,0)}</span>}
+        </span>
+        {right2}
+      </div>
+    </div>
+  );
+}
+
 export function HomeA({ prices, macro, openStock, openMacro, goTab }) {
   const { m, screen, screenErr, myStocks, macroDots, redCnt } = useHomeData({ prices, macro });
-  const [base, setBase] = useState('comp');
-  const [expand, setExpand] = useState(false);
-  const rows = rowsForBase(base, screen, myStocks);
-  const visible = rows ? (expand ? rows : rows.slice(0, 15)) : null;
-  const baseInfo = RANK_BASES.find(b=>b.key===base);
+  const [expand, setExpand] = useState({});
 
-  const th = {fontSize:10,color:'var(--dim)',fontWeight:600,textAlign:'right',padding:'8px 8px',whiteSpace:'nowrap'};
-  const td = {fontSize:12,textAlign:'right',padding:'9px 8px',whiteSpace:'nowrap'};
+  // ⭐ 이중 검증 + 매수신호 수
+  let dual = [], dualSet = new Set(), buyCnt = 0;
+  if (screen?.top30Comprehensive) {
+    const inC = new Set(screen.top30Comprehensive.map(s=>s.symbol));
+    const inM = new Set((screen.top30MarsV||[]).map(s=>s.symbol));
+    const inT = new Set((screen.top30TenBagger||[]).map(s=>s.symbol));
+    const cnt = {};
+    [...inC,...inM,...inT].forEach(sym=>{ cnt[sym]=(inC.has(sym)?1:0)+(inM.has(sym)?1:0)+(inT.has(sym)?1:0); });
+    dual = Object.entries(cnt).filter(([,c])=>c>=2)
+      .map(([sym,c])=>{
+        const src = screen.top30Comprehensive.find(s=>s.symbol===sym)||screen.top30MarsV?.find(s=>s.symbol===sym)||screen.top30TenBagger?.find(s=>s.symbol===sym);
+        return { sym, c, up: src?.upside, score: src?.comprehensive?.score };
+      })
+      .sort((a,b)=>b.c-a.c || (b.score??0)-(a.score??0));
+    dualSet = new Set(dual.map(d=>d.sym));
+    buyCnt = (screen.top30MarsV||[]).filter(s=>s.marsV?.signal==='BUY').length;
+  }
+
+  // 4열 정의
+  const columns = [
+    { key:'my', title:'내 보유·트래킹', sub:'종합점수순', items: myStocks,
+      r1: s=><span className="mono" style={{fontSize:11,fontWeight:700,color:upCol(s.upside),whiteSpace:'nowrap'}}>{upTxt(s.upside)}</span>,
+      r2: s=><span style={{fontSize:9,whiteSpace:'nowrap'}}><b className="mono" style={{color:gradeCol(s.comprehensive.grade)}}>{s.comprehensive.score}{s.comprehensive.grade}</b> <b style={{color:signalShort(s.marsV?.signal,false)[1]}}>{s.locked?'장기':signalShort(s.marsV?.signal,false)[0]}</b></span> },
+    { key:'comp', title:'종합점수 TOP30', sub:'5개 영역 100점', items: screen?.top30Comprehensive,
+      r1: s=><span className="mono" style={{fontSize:11,fontWeight:700,color:gradeCol(s.comprehensive.grade),whiteSpace:'nowrap'}}>{s.comprehensive.score} {s.comprehensive.grade}</span>,
+      r2: s=><span className="mono" style={{fontSize:10,fontWeight:700,color:upCol(s.upside),whiteSpace:'nowrap'}}>{upTxt(s.upside)}</span> },
+    { key:'mars', title:'MARS-V TOP30', sub:'18개 방법론', items: screen?.top30MarsV,
+      r1: s=>{const [t,c]=signalShort(s.marsV?.signal,s.lite,s.comprehensive?.score,s.upside);return <span style={{fontSize:10,fontWeight:700,color:c,whiteSpace:'nowrap'}}>{t}</span>;},
+      r2: s=><span className="mono" style={{fontSize:10,fontWeight:700,color:upCol(s.upside),whiteSpace:'nowrap'}}>{upTxt(s.upside)}</span> },
+    { key:'ten', title:'텐베거 TOP30', sub:'5년 10배 잠재력', items: screen?.top30TenBagger,
+      r1: s=><span className="mono" style={{fontSize:11,fontWeight:700,color:s.tenBagger>=70?'var(--green)':s.tenBagger>=50?'var(--gold)':'var(--dim2)',whiteSpace:'nowrap'}}>{s.tenBagger}점</span>,
+      r2: s=><span className="mono" style={{fontSize:10,fontWeight:700,color:upCol(s.upside),whiteSpace:'nowrap'}}>{upTxt(s.upside)}</span> },
+  ];
 
   return (
-    <div style={{paddingBottom:80}}>
-      <MacroStrip m={m} macroDots={macroDots} redCnt={redCnt} goTab={goTab} openMacro={openMacro}/>
-      <div style={{margin:'0 12px 8px',display:'flex',justifyContent:'space-between',alignItems:'center',flexWrap:'wrap',gap:8}}>
-        <BaseTabs base={base} setBase={setBase}/>
-        <span style={{fontSize:10,color:'var(--dim)'}}>{baseInfo.label} 기준 정렬 · {baseInfo.sub}</span>
-      </div>
-      {!visible && <Loading err={screenErr}/>}
-      {visible && (
-        <div style={{margin:'0 12px',background:'var(--bg2)',border:'1px solid var(--line2)',borderRadius:10,overflow:'auto'}}>
-          <table style={{width:'100%',borderCollapse:'collapse',minWidth:640}}>
-            <thead>
-              <tr style={{borderBottom:'1px solid var(--line2)',background:'var(--bg3)'}}>
-                <th style={{...th,textAlign:'left',paddingLeft:14,width:36}}>#</th>
-                <th style={{...th,textAlign:'left'}}>종목</th>
-                <th style={th}>현재가</th>
-                <th style={th}>등락</th>
-                <th style={th}>목표가</th>
-                <th style={th}>예상수익</th>
-                <th style={th}>{base==='ten'?'텐베거':'점수'}</th>
-                <th style={{...th,textAlign:'center',paddingRight:14}}>신호</th>
-              </tr>
-            </thead>
-            <tbody>
-              {visible.map((s,i)=>{
-                const [sigT, sigC] = signalShort(s.marsV?.signal, s.lite, s.comprehensive?.score, s.upside);
-                const rm = rightMetric(base, s);
-                return (
-                  <tr key={s.symbol} onClick={()=>openStock(s.symbol)} style={{borderBottom:i<visible.length-1?'1px solid var(--line)':'none',cursor:'pointer'}}>
-                    <td style={{...td,textAlign:'left',paddingLeft:14,color:'var(--dim)'}}>{i+1}</td>
-                    <td style={{...td,textAlign:'left'}}>
-                      <span className="mono" style={{fontWeight:700,color:'var(--strong)'}}>{s.symbol}</span>
-                      <span style={{fontSize:10,color:'var(--dim)',marginLeft:6}}>{s.name}</span>
-                      {s.locked&&<span style={{fontSize:9,marginLeft:4}}>🔒</span>}
-                    </td>
-                    <td className="mono" style={{...td,color:'var(--strong)',fontWeight:600}}>${fmt(s.price)}</td>
-                    <td className={`mono ${clr(s.change)}`} style={td}>{s.change!=null?`${s.change>0?'+':''}${s.change.toFixed(2)}%`:'—'}</td>
-                    <td className="mono" style={{...td,color:'var(--text)'}}>{s.target?`$${fmt(s.target,0)}`:'—'}{s.targetSrc&&<span style={{fontSize:8,color:'var(--dim)',marginLeft:3}}>{s.targetSrc}</span>}</td>
-                    <td className="mono" style={{...td,fontWeight:700,color:upCol(s.upside)}}>{upTxt(s.upside)}</td>
-                    <td style={td}>{rm.node}</td>
-                    <td style={{...td,textAlign:'center',paddingRight:14}}><span style={{fontSize:11,fontWeight:700,color:sigC}}>{sigT}</span></td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+    <div style={{paddingBottom:40}}>
+      {/* 오늘의 하이라이트 */}
+      <div style={{margin:'10px 12px',padding:'9px 13px',background:'var(--bg2)',borderRadius:12,border:'1px solid var(--gold-bd)',display:'flex',alignItems:'center',gap:10,flexWrap:'wrap'}}>
+        <span style={{fontSize:11,fontWeight:700,color:'var(--gold)',flexShrink:0}}>⭐ 이중 검증</span>
+        {dual.length>0 ? (
+          <div style={{display:'flex',gap:5,flexWrap:'wrap',flex:1}}>
+            {dual.slice(0,8).map(d=>(
+              <span key={d.sym} onClick={()=>openStock(d.sym)} className="mono" style={{fontSize:11,fontWeight:700,padding:'2px 8px',borderRadius:6,background:'var(--gold-bg)',border:'1px solid var(--gold-bd)',color:'var(--strong)',cursor:'pointer'}}>
+                {d.sym}{d.up!=null&&<span style={{color:d.up>0?'var(--green)':'var(--red)',marginLeft:3}}>{d.up>0?'+':''}{d.up.toFixed(0)}%</span>}
+              </span>
+            ))}
+          </div>
+        ) : <span style={{fontSize:10,color:'var(--dim)',flex:1}}>스크리닝 로딩 중...</span>}
+        <div style={{display:'flex',gap:10,alignItems:'center',flexShrink:0}}>
+          <span style={{fontSize:10,color:'var(--dim2)'}}>매수신호 <b style={{color:'var(--green)'}}>{buyCnt}</b>개</span>
+          <span onClick={()=>goTab('macroguru')} style={{fontSize:10,color:'var(--dim2)',cursor:'pointer'}}>시장 <b style={{color:redCnt>=4?'var(--red)':redCnt>=2?'var(--gold)':'var(--green)'}}>{redCnt>=4?'위험':redCnt>=2?'주의':'양호'}</b> →</span>
         </div>
-      )}
-      {rows&&rows.length>15&&!expand&&(
-        <div onClick={()=>setExpand(true)} style={{margin:'8px 12px',padding:'9px',textAlign:'center',fontSize:11,color:'var(--blue)',cursor:'pointer',background:'var(--bg2)',border:'1px solid var(--line2)',borderRadius:8}}>전체 {rows.length}개 보기 ▼</div>
-      )}
+      </div>
+
+      {screenErr&&<Loading err={screenErr}/>}
+
+      {/* 4열: 내 종목 | 종합 | MARS-V | 텐베거 */}
+      <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(250px,1fr))',gap:9,margin:'0 12px'}}>
+        {columns.map(col=>{
+          const items = col.items;
+          const isExp = expand[col.key];
+          const visible = items ? (isExp ? items : items.slice(0,15)) : null;
+          return (
+            <div key={col.key} style={{background:'var(--bg2)',border:'1px solid var(--line2)',borderRadius:10,overflow:'hidden',alignSelf:'start'}}>
+              <div style={{padding:'8px 10px',background:'var(--bg3)',borderBottom:'1px solid var(--line2)',display:'flex',justifyContent:'space-between',alignItems:'baseline'}}>
+                <span style={{fontSize:11,fontWeight:700,color:'var(--strong)'}}>{col.title}</span>
+                <span style={{fontSize:8,color:'var(--dim)'}}>{col.sub}</span>
+              </div>
+              {!visible&&<div style={{padding:12}}>{Array.from({length:8}).map((_,i)=><div key={i} style={{height:11,background:'var(--bg3)',borderRadius:5,marginBottom:9,opacity:1-i*0.09}}/>)}</div>}
+              {visible&&visible.map((s,i)=>(
+                <ARow key={s.symbol} rank={col.key==='my'?null:i+1} s={s} last={i===visible.length-1&&!(items.length>15&&!isExp)}
+                  highlight={col.key!=='my'&&dualSet.has(s.symbol)}
+                  onClick={()=>openStock(s.symbol)} right1={col.r1(s)} right2={col.r2(s)}/>
+              ))}
+              {visible&&items.length>15&&!isExp&&(
+                <div onClick={()=>setExpand(e=>({...e,[col.key]:true}))} style={{padding:'7px',textAlign:'center',fontSize:10,color:'var(--blue)',cursor:'pointer',borderTop:'1px solid var(--line)'}}>{items.length}개 전체 ▼</div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      <div style={{margin:'8px 14px 0',fontSize:9,color:'var(--dim)'}}>
+        금색 배경 = 2개 이상 체계 동시 상위권 · 예상수익 = (목표가-현재가)/현재가, 목표가는 자체 DCF 우선·없으면 애널리스트 평균 · 이 순위는 위험조정 전 기대수익 기준입니다
+      </div>
     </div>
   );
 }
