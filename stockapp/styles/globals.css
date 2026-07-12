@@ -1,30 +1,34 @@
 @import url('https://fonts.googleapis.com/css2?family=Pretendard:wght@300;400;500;600;700&family=JetBrains+Mono:wght@300;400;500;600&display=swap');
 
+/* 디자인 A — 클린 테이블(밝은 배경). 단일 소스, concepts.js A와 동일 */
 :root {
-  --bg:     #09090f;
-  --bg2:    #10111a;
-  --bg3:    #181924;
-  --bg4:    #1e2030;
-  --line:   rgba(255,255,255,0.05);
-  --line2:  rgba(255,255,255,0.10);
-  --text:   #d8dae8;
-  --dim:    #5a5f7a;
-  --dim2:   #7a80a0;
-  --gold:   #c9a84c;
-  --gold2:  #e5c87a;
-  --green:  #00d98a;
-  --red:    #ff3f5c;
-  --blue:   #4d9fff;
-  --pur:    #8b7fff;
-  --orange: #ff8c42;
-  --green-bg: rgba(0,217,138,.10);
-  --green-bd: rgba(0,217,138,.22);
-  --red-bg: rgba(255,63,92,.10);
-  --red-bd: rgba(255,63,92,.22);
-  --gold-bg: rgba(201,168,76,.10);
-  --gold-bd: rgba(201,168,76,.22);
-  --pur-bg: rgba(139,127,255,.10);
-  --pur-bd: rgba(139,127,255,.22);
+  --bg:     #f7f6f2;
+  --bg2:    #ffffff;
+  --bg3:    #f1efe8;
+  --bg4:    #e4e2d8;
+  --text:   #3d3d3a;
+  --strong: #191917;
+  --line:   rgba(60,60,50,0.10);
+  --line2:  rgba(60,60,50,0.18);
+  --dim:    #9a988e;
+  --dim2:   #5f5e5a;
+  --gold:   #8f6a10;
+  --gold2:  #6e5109;
+  --green:  #137333;
+  --red:    #c5221f;
+  --blue:   #185fa5;
+  --pur:    #534ab7;
+  --orange: #b05a00;
+  --green-bg: rgba(19,115,51,.08);
+  --green-bd: rgba(19,115,51,.35);
+  --red-bg: rgba(197,34,31,.07);
+  --red-bd: rgba(197,34,31,.35);
+  --gold-bg: rgba(143,106,16,.09);
+  --gold-bd: rgba(143,106,16,.35);
+  --pur-bg: rgba(83,74,183,.08);
+  --pur-bd: rgba(83,74,183,.32);
+  --blue-bg: rgba(24,95,165,.08);
+  --blue-bd: rgba(24,95,165,.32);
   --nav-h:  60px;
   --status-h: 44px;
 }
